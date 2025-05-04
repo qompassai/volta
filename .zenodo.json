@@ -5,8 +5,8 @@
   "language": "eng",
   "upload_type": "software",
   "access_right": "open",
-  "version": "aa72f2e",
-  "publication_date": "2025-05-03",
+  "version": "0b1feab-dirty",
+  "publication_date": "2025-05-04",
   "creators": [
     {
       "name": "Porter, Matthew A.",
@@ -18,7 +18,7 @@
   "keywords": ["AI","Education","Healthcare","Post-Quantum Cryptography","Quantum","performance","rust","systems programming"],
   "related_identifiers": [
     { "identifier": "https://github.com/qompassai/volta", "relation": "isSupplementTo", "resource_type": "software" },
-    { "identifier": "https://github.com/qompassai/volta/releases/tag/2025-05-03", "relation": "isIdenticalTo", "resource_type": "software" },
+    { "identifier": "https://github.com/qompassai/volta/releases/tag/2025-05-04", "relation": "isIdenticalTo", "resource_type": "software" },
     { "identifier": "https://orcid.org/0000-0002-0302-4812", "relation": "isAuthorOf", "resource_type": "person" },
     { "identifier": "https://github.com/qompassai/volta/actions", "relation": "isCompiledBy", "resource_type": "workflow" }
   ],
