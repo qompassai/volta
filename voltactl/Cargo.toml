@@ -1,0 +1,39 @@
+[package]
+name = "voltactl"
+version = "1.0.0"
+edition = "2021"
+authors = ["Matt A. Porter <map@qompass.ai>"]
+description = "CLI and library for managing Volta AI compute fabric"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/qompassai/voltactl"
+homepage = "https://github.com/qompassai/volta"
+documentation = "https://docs.qompass.ai/voltactl"
+keywords = ["cli", "volta", "ai", "controller"]
+categories = ["command-line-utilities", "network-programming"]
+readme = "README.md"
+exclude = ["/docs-private", "*.secret"]
+autotests = true
+publish = true
+
+[dependencies]
+volta-database = { path = "../database" }
+anyhow = "1"
+sequoia-openpgp =  { version = "1", default-features = false, features = ["crypto-nettle"] }
+multipart = "0"
+log = "0"
+rand = "0.6"
+serde = { version = "1.0", features = ["derive"] }
+serde_derive = "1.0"
+serde_json = "1.0"
+time = "0.1"
+tempfile = "3.0"
+url = "1.6"
+hex = "0.3"
+base64 = "0.10"
+pathdiff = "0.1"
+idna = "0.1"
+fs2 = "0.4"
+walkdir = "2.2"
+clap = "2"
+toml = "0.5.0"
+indicatif = "0.11.0"

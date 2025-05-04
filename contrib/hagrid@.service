@@ -1,0 +1,13 @@
+[Unit]
+Description=Volta Verifying Keyserver
+After=network.target
+
+[Service]
+ExecStart=/opt/Qompass/volta/target/release/volta /opt/Qompass/volta/dist -D %i -F volta@%i
+WorkingDirectory=/opt/volta
+User=volta
+Group=volta
+StandardOutput=syslog
+
+[Install]
+WantedBy=multi-user.target

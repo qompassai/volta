@@ -1,0 +1,29 @@
+[package]
+name = "volta-database"
+version = "0.1.0"
+authors = ["Matt A. Porter <map@qompass.ai>"]
+
+[dependencies]
+anyhow = "1"
+sequoia-openpgp =  { version = "1", default-features = false, features = ["crypto-nettle"] }
+multipart = "0"
+log = "0"
+rand = "0.6"
+serde = { version = "1.0", features = ["derive"] }
+serde_derive = "1.0"
+serde_json = "1.0"
+time = "0.1"
+tempfile = "3.0"
+url = "1.6"
+hex = "0.3"
+base64 = "0.10"
+pathdiff = "0.1"
+idna = "0.1"
+fs2 = "0.4"
+walkdir = "2.2"
+chrono = "0.4"
+zbase32 = "0.1.2"
+
+[lib]
+name = "volta_database"
+path = "src/lib.rs"

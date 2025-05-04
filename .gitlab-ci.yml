@@ -1,0 +1,13 @@
+build, test and lint:
+    image: "rust:1-bullseye"
+    interruptible: true
+    script:
+        - apt update -qy
+        - apt install -qy build-essential pkg-config clang libclang-dev nettle-dev gettext zsh
+        - rustup component add clippy
+        - rustup component add rustfmt
+        - ./make-translated-templates
+        - cargo build
+        - cargo clippy --tests --no-deps --workspace
+        - cargo fmt --all -- --check
+        - cargo test --all
