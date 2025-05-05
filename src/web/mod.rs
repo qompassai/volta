@@ -487,7 +487,7 @@ fn rocket_factory(
         }))
         .attach(maintenance_mode)
         .manage(get_i18n())
-        .manage(hagrid_state)
+        .manage(volta_state)
         .manage(stateless_token_service)
         .manage(stateful_token_service)
         .manage(mail_service)
@@ -672,7 +672,7 @@ pub mod tests {
             .merge(("base-URI", BASE_URI))
             .merge(("base-URI-Onion", BASE_URI_ONION))
             .merge(("from", "from@example.com"))
-            .merge(("token_secret", "hagrid"))
+            .merge(("token_secret", "volta"))
             .merge(("token_validity", 3600u64))
             .merge((
                 "filemail_into",
@@ -709,7 +709,7 @@ pub mod tests {
         assert_eq!(response.status(), Status::Ok);
         assert_eq!(response.content_type(), Some(ContentType::HTML));
         // TODO check translation
-        assert!(response.into_string().unwrap().contains("Hagrid"));
+        assert!(response.into_string().unwrap().contains("Volta"));
     }
 
     #[test]
@@ -722,7 +722,7 @@ pub mod tests {
         let response = client.get("/").dispatch();
         assert_eq!(response.status(), Status::Ok);
         assert_eq!(response.content_type(), Some(ContentType::HTML));
-        assert!(response.into_string().unwrap().contains("Hagrid"));
+        assert!(response.into_string().unwrap().contains("Volta"));
 
         // Check that we see the privacy policy.
         let response = client.get("/about").dispatch();
