@@ -3,7 +3,7 @@ Description=Volta Verifying Keyserver
 After=network.target
 
 [Service]
-ExecStart=/opt/Qompass/volta/target/release/volta /opt/Qompass/volta/dist -D %i -F volta@%i
+ExecStart=/opt/qai/volta/target/release/volta /opt/qai/volta/dist -D %i -F volta@%i
 WorkingDirectory=/opt/volta
 User=volta
 Group=volta
