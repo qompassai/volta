@@ -27,7 +27,6 @@ pkgs.mkShell {
     transifex-client
   ];
 
-  # Set Environment Variables
   RUST_BACKTRACE = 1;
 
   # compilation of -sys packages requires manually setting this :(
