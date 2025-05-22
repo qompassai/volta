@@ -5,7 +5,7 @@ authors = ["Matt A. Porter <map@qompass.ai>"]
 build = "build.rs"
 default-run = "volta"
 edition = "2024"
-license = "MIT OR Apache-2.0"
+license = "AGPL 3.0 AND Q-CDA 1.0"
 [workspace]
 members = [
     "database",
@@ -52,7 +52,6 @@ features = ["rocket"]
 [dependencies.lettre]
 version = "0.10.0-pre"
 default-features = false
-# smtp-transport doesn't build (openssl problem)
 features = ["builder", "file-transport", "sendmail-transport"]
 git = "https://github.com/lettre/lettre"
 rev = "245c600c82ee18b766e8729f005ff453a55dce34"
