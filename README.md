@@ -6,7 +6,8 @@
 
 <h3> Your Quality KeyServer </h3>
 ![Repository Views](https://komarev.com/ghpvc/?username=qompassai-volta)
-![GitHub all releases](https://img.shields.io/github/downloads/qompassai/tor/total?style=flat-square)
+![GitHub all releases](https://img.shields.io/github/downloads/qompassai/volta/total?style=flat-square)
+
 <p align="center">
   <a href="https://www.rust-lang.org/"><img src="https://img.shields.io/badge/Rust-000000?style=for-the-badge&logo=rust&logoColor=white" alt="Rust"></a>
   <br>
@@ -16,14 +17,6 @@
   <a href="https://www.gnu.org/licenses/agpl-3.0"><img src="https://img.shields.io/badge/License-AGPL%20v3-blue.svg" alt="License: AGPL v3"></a>
   <a href="./LICENSE-QCDA"><img src="https://img.shields.io/badge/license-Q--CDA-lightgrey.svg" alt="License: Q-CDA"></a>
 </p>
-
-### 📄 Rust Projects
-
-- [Qompass Volta](https://github.com/qompassai/volta)
-- [Qompass Vongola](https://github.com/qompassai/vongola)
-- [Qompass Hold](https://github.com/qompassai/qompass-hold)
-
----
 
 <details id="Contact">
   <summary><strong>Contact Qompass AI</strong></summary>
