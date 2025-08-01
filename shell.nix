@@ -1,3 +1,7 @@
+# /qompassai/volta/shell.nix
+# Qompass AI Volta Nix Shell
+# Copyright (C) 2025 Qompass AI, All rights reserved
+#####################################################
 let
   oxalica_overlay = import (builtins.fetchTarball
     "https://github.com/oxalica/rust-overlay/archive/master.tar.gz");
@@ -15,23 +19,17 @@ pkgs.mkShell {
       ];
     })
   ];
-
   buildInputs = with pkgs; [
     openssl
-
     clang
     nettle
     pkgconfig
-
     gettext
     transifex-client
   ];
-
   RUST_BACKTRACE = 1;
-
   # compilation of -sys packages requires manually setting this :(
   shellHook = ''
     export LIBCLANG_PATH="${pkgs.llvmPackages.libclang.lib}/lib";
   '';
 }
-
