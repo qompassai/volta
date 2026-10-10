@@ -63,7 +63,9 @@
         src = ./.;
         cargoLock.lockFile = ./Cargo.lock;
         cargoBuildFlags = ["--package" "volta-cli"];
+        buildInputs = [pkgs.openssl];
         doCheck = false;
+        nativeBuildInputs = [pkgs.pkg-config];
         meta.license = with pkgs.lib.licenses; [agpl3Only asl20];
       };
       volta-server = rustPlatform.buildRustPackage {
@@ -72,7 +74,9 @@
         src = ./.;
         cargoLock.lockFile = ./Cargo.lock;
         cargoBuildFlags = ["--package" "volta-server"];
+        buildInputs = [pkgs.openssl];
         doCheck = false;
+        nativeBuildInputs = [pkgs.pkg-config];
         meta.license = with pkgs.lib.licenses; [agpl3Only asl20];
       };
     });
