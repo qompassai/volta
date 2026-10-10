@@ -9,3 +9,7 @@
 docs/book/book/
 # Cargo build output for the rewrite workspace.
 /.target/
+
+# Nix build outputs.
+result
+result-*
