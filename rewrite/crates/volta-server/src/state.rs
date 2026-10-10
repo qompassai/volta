@@ -112,10 +112,22 @@ impl AppState {
             }
             None => (None, None),
         };
-        let mut bootstrap_bytes = [0u8; 24];
-        rand::RngCore::fill_bytes(&mut rand::rngs::OsRng, &mut bootstrap_bytes);
+        // First-enrollment bootstrap: if no credentials and no
+        // bootstrap on record, mint one, keep only its hash in
+        // the operator store, and expose the plaintext once (the
+        // server main prints it to the host console; `voltactl
+        // operator bootstrap` does the same on demand).
+        let bootstrap_token = if operator.any_credentials() || operator.has_bootstrap() {
+            String::new()
+        } else {
+            let mut bootstrap_bytes = [0u8; 24];
+            rand::RngCore::fill_bytes(&mut rand::rngs::OsRng, &mut bootstrap_bytes);
+            let token = crate::http_util::b64u_encode(&bootstrap_bytes);
+            operator.set_bootstrap_hash(&crate::http_util::sha256_hex(token.as_bytes()))?;
+            token
+        };
         Ok(Self {
-            bootstrap_token: crate::http_util::b64u_encode(&bootstrap_bytes),
+            bootstrap_token,
             config: Arc::new(config),
             ephemeral: Arc::new(ephemeral),
             identity,

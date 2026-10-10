@@ -88,6 +88,24 @@ fn tools() -> Vec<Tool> {
     ]
 }
 
+/// The tools/list result (shared with the stdio transport).
+#[must_use]
+pub fn tools_list_json_pub() -> Value {
+    tools_list_json()
+}
+
+/// Dispatch one tool call (shared with the stdio transport,
+/// SPEC 8.1 MCP-3). Auth classes are enforced exactly as on the
+/// HTTP transport.
+pub async fn dispatch_tool(
+    state: &AppState,
+    caller: &Caller,
+    name: &str,
+    arguments: &Value,
+) -> Result<Value, VoltaError> {
+    call_tool(state, caller, name, arguments).await
+}
+
 fn tools_list_json() -> Value {
     let list: Vec<Value> = tools()
         .iter()

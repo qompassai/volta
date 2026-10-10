@@ -70,7 +70,10 @@ impl OperatorStore {
         let conn = Connection::open(data_dir.join("operator.db"))
             .map_err(|e| VoltaError::ConfigInvalid(e.to_string()))?;
         conn.execute_batch(
-            "CREATE TABLE IF NOT EXISTS wa_credentials (
+            "CREATE TABLE IF NOT EXISTS bootstrap_tokens (
+                token_hash TEXT PRIMARY KEY
+            );
+             CREATE TABLE IF NOT EXISTS wa_credentials (
                 cred_id TEXT PRIMARY KEY,
                 operator_id TEXT NOT NULL,
                 nickname TEXT NOT NULL,
@@ -93,6 +96,69 @@ impl OperatorStore {
             sessions: Mutex::new(BTreeMap::new()),
             webauthn: Arc::new(webauthn),
         })
+    }
+
+    /// Record the hash of an issued bootstrap token (the token
+    /// itself is printed once by whoever issued it and never
+    /// stored).
+    ///
+    /// # Errors
+    /// `E_CONFIG_INVALID` on storage failure.
+    pub fn set_bootstrap_hash(&self, token_hash: &str) -> Result<(), VoltaError> {
+        let conn = self.conn.lock().map_err(|_| VoltaError::ConfigInvalid("lock".into()))?;
+        conn.execute(
+            "INSERT OR REPLACE INTO bootstrap_tokens (token_hash) VALUES (?1)",
+            params![token_hash],
+        )
+        .map_err(|e| VoltaError::ConfigInvalid(e.to_string()))?;
+        Ok(())
+    }
+
+    /// Whether a bootstrap token hash is on record.
+    #[must_use]
+    pub fn has_bootstrap(&self) -> bool {
+        self.conn
+            .lock()
+            .ok()
+            .and_then(|conn| {
+                conn.query_row("SELECT COUNT(*) FROM bootstrap_tokens", [], |row| {
+                    row.get::<_, i64>(0)
+                })
+                .ok()
+            })
+            .unwrap_or(0)
+            > 0
+    }
+
+    /// Whether a presented bootstrap token matches the record.
+    #[must_use]
+    pub fn bootstrap_matches(&self, presented: &str) -> bool {
+        let digest = crate::http_util::sha256_hex(presented.as_bytes());
+        self.conn
+            .lock()
+            .ok()
+            .and_then(|conn| {
+                conn.query_row(
+                    "SELECT COUNT(*) FROM bootstrap_tokens WHERE token_hash = ?1",
+                    params![digest],
+                    |row| row.get::<_, i64>(0),
+                )
+                .ok()
+            })
+            .unwrap_or(0)
+            > 0
+    }
+
+    /// Clear any bootstrap record (after enrollment or a
+    /// break-glass reset).
+    ///
+    /// # Errors
+    /// `E_CONFIG_INVALID` on storage failure.
+    pub fn clear_bootstrap(&self) -> Result<(), VoltaError> {
+        let conn = self.conn.lock().map_err(|_| VoltaError::ConfigInvalid("lock".into()))?;
+        conn.execute("DELETE FROM bootstrap_tokens", [])
+            .map_err(|e| VoltaError::ConfigInvalid(e.to_string()))?;
+        Ok(())
     }
 
     /// The WebAuthn engine.
@@ -396,12 +462,14 @@ pub async fn register_options(
     body: axum::body::Bytes,
 ) -> Response {
     let request_id = crate::ephemeral::new_request_id();
+    let presented_bootstrap = headers
+        .get("x-volta-bootstrap")
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or("");
     let authorized = crate::auth::operator_session(&state, &headers).is_some()
         || (!state.operator.any_credentials()
-            && headers
-                .get("x-volta-bootstrap")
-                .and_then(|value| value.to_str().ok())
-                == Some(state.bootstrap_token.as_str()));
+            && ((!state.bootstrap_token.is_empty() && presented_bootstrap == state.bootstrap_token)
+                || state.operator.bootstrap_matches(presented_bootstrap)));
     if !authorized {
         return problem(VoltaError::AuthRequired, &request_id).into_response();
     }

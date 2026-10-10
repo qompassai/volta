@@ -1,3 +1,7 @@
+# crates/volta-cli/Cargo.toml - volta-cli manifest.
+#
+# Dual licensed under AGPL-3.0-only OR Apache-2.0.
+
 [package]
 name = "volta-cli"
 version.workspace = true
@@ -7,7 +11,11 @@ rust-version.workspace = true
 description = "Volta clean-room rewrite: operator CLI (voltactl) and volta-delete"
 
 [dependencies]
+base64.workspace = true
 clap.workspace = true
+rand.workspace = true
+rusqlite.workspace = true
+url.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 tokio.workspace = true

@@ -268,3 +268,72 @@ fn dechunk(body: &str) -> String {
 pub fn now() -> u64 {
     unix_now()
 }
+
+/// One sync-feed entry.
+fn sync_entries(state: &AppState) -> Vec<(String, i64, String)> {
+    let db_path = std::path::PathBuf::from(&state.config.data_dir).join("index.sqlite3");
+    let Ok(conn) = rusqlite::Connection::open(db_path) else {
+        return Vec::new();
+    };
+    let Ok(mut stmt) = conn.prepare(
+        "SELECT fingerprint, revision, content_sha256 FROM certificates ORDER BY fingerprint ASC",
+    ) else {
+        return Vec::new();
+    };
+    let rows = stmt.query_map([], |row| {
+        Ok((
+            row.get::<_, String>(0)?,
+            row.get::<_, i64>(1)?,
+            row.get::<_, String>(2)?,
+        ))
+    });
+    match rows {
+        Ok(rows) => rows.filter_map(Result::ok).collect(),
+        Err(_) => Vec::new(),
+    }
+}
+
+/// GET /relay/v1/root — the sync feed's Merkle root (SPEC 12.4):
+/// SHA-256 over the sorted (fingerprint, revision, content hash)
+/// lines; `cursor` is the entry count the root covers.
+pub async fn root(State(state): State<Arc<AppState>>) -> Response {
+    let entries = sync_entries(&state);
+    let mut transcript = String::new();
+    for (fingerprint, revision, content_sha256) in &entries {
+        transcript.push_str(&format!("{fingerprint}:{revision}:{content_sha256}\n"));
+    }
+    Json(json!({
+        "cursor": entries.len(),
+        "merkle_root": crate::http_util::sha256_hex(transcript.as_bytes()),
+    }))
+    .into_response()
+}
+
+/// GET /relay/v1/changes?since=<cursor> — entries after the
+/// caller's cursor; an unknown or stale cursor receives the full
+/// snapshot (bootstrap semantics, SPEC 12.4).
+pub async fn changes(
+    State(state): State<Arc<AppState>>,
+    Query(params): Query<BTreeMap<String, String>>,
+) -> Response {
+    let entries = sync_entries(&state);
+    let since: usize = params
+        .get("since")
+        .and_then(|text| text.parse().ok())
+        .unwrap_or(0);
+    let list: Vec<Value> = if since >= entries.len() {
+        Vec::new()
+    } else {
+        entries
+            .iter()
+            .map(|(fingerprint, revision, content_sha256)| {
+                json!({
+                    "content_sha256": content_sha256,
+                    "fingerprint": fingerprint,
+                    "revision": revision,
+                })
+            })
+            .collect()
+    };
+    Json(json!({"cursor": entries.len(), "entries": list})).into_response()
+}

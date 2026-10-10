@@ -10,7 +10,7 @@ license.workspace = true
 rust-version.workspace = true
 
 [[bin]]
-name = "volta-server"
+name = "volta"
 path = "src/main.rs"
 
 [dependencies]
