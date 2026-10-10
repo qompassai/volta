@@ -1,3 +1,21 @@
+// #################################################################
+// /qompassai/volta/voltactl/src/regenerate.rs
+// Qompass AI Regenerate
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Qompass AI
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 use anyhow::Result;
 
 use std::path::Path;
@@ -6,9 +24,9 @@ use std::time::Instant;
 use indicatif::{ProgressBar, ProgressStyle};
 use walkdir::WalkDir;
 
+use crate::VoltaConfig;
 use database::types::Fingerprint;
 use database::{Database, KeyDatabase, RegenerateResult};
-use VoltaConfig;
 
 struct RegenerateStats<'a> {
     progress: &'a ProgressBar,
@@ -41,7 +59,7 @@ impl<'a> RegenerateStats<'a> {
         // If a new TPK starts, parse and import.
         self.count_total += 1;
         self.count_partial += 1;
-        if (self.count_total % 10) == 0 {
+        if self.count_total.is_multiple_of(10) {
             self.prefix = fpr.to_string()[0..4].to_owned();
         }
         match result {
@@ -56,7 +74,7 @@ impl<'a> RegenerateStats<'a> {
     }
 
     fn progress_update(&mut self) {
-        if (self.count_total % 10) != 0 {
+        if !self.count_total.is_multiple_of(10) {
             return;
         }
         if self.count_partial >= 1000 {
@@ -71,7 +89,7 @@ impl<'a> RegenerateStats<'a> {
     }
 }
 
-pub fn do_regenerate(config: &VoltConfig) -> Result<()> {
+pub fn do_regenerate(config: &VoltaConfig) -> Result<()> {
     let db = KeyDatabase::new_internal(
         config.keys_internal_dir.as_ref().unwrap(),
         config.keys_external_dir.as_ref().unwrap(),

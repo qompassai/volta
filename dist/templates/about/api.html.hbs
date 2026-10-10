@@ -1,0 +1,33 @@
+{{!-- First-party page written for Volta (Qompass AI, 2026). --}}
+{{#> layout }}
+  <h2>{{ text "API" }}</h2>
+
+  <p>Volta speaks the two protocols OpenPGP clients already use:</p>
+
+  <h3>Verifying Keyserver (VKS) API</h3>
+  <ul>
+    <li><code>GET /vks/v1/by-fingerprint/&lt;fingerprint&gt;</code></li>
+    <li><code>GET /vks/v1/by-keyid/&lt;key-id&gt;</code></li>
+    <li><code>GET /vks/v1/by-email/&lt;address&gt;</code></li>
+    <li><code>POST /vks/v1/upload</code> — upload a key (JSON body with a
+      <code>keytext</code> field)</li>
+    <li><code>POST /vks/v1/request-verify</code> — request verification
+      emails for the uploaded key's addresses</li>
+  </ul>
+
+  <h3>HKP</h3>
+  <ul>
+    <li><code>GET /pks/lookup?op=get&amp;search=&lt;query&gt;</code></li>
+    <li><code>GET /pks/lookup?op=index&amp;search=&lt;query&gt;</code></li>
+    <li><code>POST /pks/add</code> — submit an armored key</li>
+  </ul>
+
+  <h3>Web Key Directory (WKD)</h3>
+  <p>
+    Keys with a verified address are also available through the Web Key
+    Directory under
+    <code>/.well-known/openpgpkey/&lt;domain&gt;/hu/&lt;hash&gt;</code>,
+    with the policy file at
+    <code>/.well-known/openpgpkey/&lt;domain&gt;/policy</code>.
+  </p>
+{{/layout}}

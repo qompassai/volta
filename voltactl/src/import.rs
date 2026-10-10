@@ -1,3 +1,21 @@
+// #################################################################
+// /qompassai/volta/voltactl/src/import.rs
+// Qompass AI Import
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Qompass AI
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 use std::cmp::min;
 use std::fs::File;
 use std::io::Read;
@@ -10,15 +28,15 @@ use anyhow::Result;
 extern crate tempfile;
 
 extern crate sequoia_openpgp as openpgp;
-use openpgp::parse::{PacketParser, PacketParserResult, Parse};
 use openpgp::Packet;
+use openpgp::parse::{PacketParser, PacketParserResult, Parse};
 
 extern crate volta_database as database;
 use database::{Database, ImportResult, KeyDatabase};
 
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 
-use VoltaConfig;
+use crate::VoltaConfig;
 
 // parsing TPKs takes time, so we benefit from some parallelism. however, the
 // database is locked during the entire merge operation, so we get diminishing
@@ -54,7 +72,7 @@ pub fn do_import(config: &VoltaConfig, dry_run: bool, input_files: Vec<PathBuf>)
 }
 
 fn setup_chunks(mut input_files: Vec<PathBuf>, num_threads: usize) -> Vec<Vec<PathBuf>> {
-    let chunk_size = (input_files.len() + (num_threads - 1)) / num_threads;
+    let chunk_size = input_files.len().div_ceil(num_threads);
     (0..num_threads)
         .map(|_| {
             let len = input_files.len();
@@ -99,12 +117,12 @@ impl<'a> ImportStats<'a> {
     }
 
     fn progress_update(&self) {
-        if (self.count_total % 10) != 0 {
+        if !self.count_total.is_multiple_of(10) {
             return;
         }
         self.progress.set_message(&format!(
             "{}, imported {:5} keys, {:5} New {:5} Updated {:5} Unchanged {:5} Errors",
-            &self.filename,
+            self.filename,
             self.count_total,
             self.count_new,
             self.count_updated,
@@ -182,11 +200,11 @@ fn read_file_to_tpks(
         let (packet, tmp) = pp.next()?;
         ppr = tmp;
 
-        if !acc.is_empty() {
-            if let Packet::PublicKey(_) | Packet::SecretKey(_) = packet {
-                callback(acc);
-                acc = vec![];
-            }
+        if !acc.is_empty()
+            && let Packet::PublicKey(_) | Packet::SecretKey(_) = packet
+        {
+            callback(acc);
+            acc = vec![];
         }
 
         acc.push(packet);

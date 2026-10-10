@@ -1,4 +1,21 @@
 #![recursion_limit = "1024"]
+// #################################################################
+// /qompassai/volta/database/src/lib.rs
+// Qompass AI Volta Database Library
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Qompass AI
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 use std::convert::TryFrom;
 use std::str::FromStr;
@@ -27,7 +44,7 @@ extern crate walkdir;
 extern crate zbase32;
 
 extern crate sequoia_openpgp as openpgp;
-use openpgp::{packet::UserID, parse::Parse, types::KeyFlags, Cert};
+use openpgp::{Cert, packet::UserID, parse::Parse, types::KeyFlags};
 
 pub mod types;
 use types::{Email, Fingerprint, KeyID};
@@ -42,7 +59,7 @@ mod stateful_tokens;
 pub use stateful_tokens::StatefulTokens;
 
 mod openpgp_utils;
-use openpgp_utils::{is_status_revoked, tpk_clean, tpk_filter_alive_emails, tpk_to_string, POLICY};
+use openpgp_utils::{POLICY, is_status_revoked, tpk_clean, tpk_filter_alive_emails, tpk_to_string};
 
 #[cfg(test)]
 mod test;
@@ -173,9 +190,9 @@ pub trait Database: Sync + Send {
     fn lookup(&self, term: &Query) -> Result<Option<Cert>> {
         use self::Query::*;
         let armored = match term {
-            ByFingerprint(ref fp) => self.by_fpr(fp),
-            ByKeyID(ref keyid) => self.by_kid(keyid),
-            ByEmail(ref email) => self.by_email(email),
+            ByFingerprint(fp) => self.by_fpr(fp),
+            ByKeyID(keyid) => self.by_kid(keyid),
+            ByEmail(email) => self.by_email(email),
             _ => None,
         };
 
@@ -245,14 +262,13 @@ pub trait Database: Sync + Send {
 
         let mut email_status: Vec<_> = full_tpk_new
             .userids()
-            .map(|binding| {
+            .filter_map(|binding| {
                 if let Ok(email) = Email::try_from(binding.userid()) {
                     Some((binding, email))
                 } else {
                     None
                 }
             })
-            .flatten()
             .filter(|(binding, email)| {
                 known_uids.contains(binding.userid()) || published_emails.contains(email)
             })
@@ -293,8 +309,7 @@ pub trait Database: Sync + Send {
                     .userids()
                     .filter(|binding| !is_status_revoked(binding.revocation_status(&POLICY, None)))
                     .map(|binding| binding.userid())
-                    .map(|uid| Email::try_from(uid).ok())
-                    .flatten()
+                    .filter_map(|uid| Email::try_from(uid).ok())
                     .any(|unrevoked_email| &unrevoked_email == *email);
                 !has_unrevoked_userid
             })
@@ -335,7 +350,7 @@ pub trait Database: Sync + Send {
 
         for fpr in fpr_not_linked {
             if let Err(e) = self.link_fpr(&fpr, &fpr_primary) {
-                info!("Error ensuring symlink! {} {} {:?}", &fpr, &fpr_primary, e);
+                info!("Error ensuring symlink! {} {} {:?}", fpr, fpr_primary, e);
             }
         }
 
@@ -343,7 +358,7 @@ pub trait Database: Sync + Send {
             if let Err(e) = self.unlink_email(revoked_email, &fpr_primary) {
                 info!(
                     "Error ensuring symlink! {} {} {:?}",
-                    &fpr_primary, &revoked_email, e
+                    fpr_primary, revoked_email, e
                 );
             }
         }
@@ -367,7 +382,7 @@ pub trait Database: Sync + Send {
         let log_name = self.get_current_log_filename();
         println!("{}", log_name);
         if let Err(e) = self.write_log_append(&log_name, fpr_primary) {
-            error!("Error writing to log! {} {} {}", &log_name, &fpr_primary, e);
+            error!("Error writing to log! {} {} {}", log_name, fpr_primary, e);
         }
     }
 
@@ -468,8 +483,7 @@ pub trait Database: Sync + Send {
             .unwrap_or_default();
         let published_emails_old: Vec<Email> = published_uids_old
             .iter()
-            .map(|uid| Email::try_from(uid).ok())
-            .flatten()
+            .filter_map(|uid| Email::try_from(uid).ok())
             .collect();
 
         // println!("publishing: {:?}", &uid_new);
@@ -485,8 +499,7 @@ pub trait Database: Sync + Send {
 
         if !published_tpk_new
             .userids()
-            .map(|binding| Email::try_from(binding.userid()))
-            .flatten()
+            .flat_map(|binding| Email::try_from(binding.userid()))
             .any(|email| email == *email_new)
         {
             return Err(anyhow!("Requested UserID not found!"));
@@ -503,7 +516,7 @@ pub trait Database: Sync + Send {
         if let Err(e) = self.link_email(email_new, fpr_primary) {
             info!(
                 "Error ensuring email symlink! {} -> {} {:?}",
-                &email_new, &fpr_primary, e
+                email_new, fpr_primary, e
             );
         }
 
@@ -517,14 +530,14 @@ pub trait Database: Sync + Send {
     ) -> Result<()> {
         let current_link_fpr =
             self.lookup_primary_fingerprint(&Query::ByEmail(unlink_email.clone()));
-        if let Some(current_fpr) = current_link_fpr {
-            if current_fpr != *fpr_primary {
-                self.nolock_set_email_unpublished_filter(&current_fpr, |uid| {
-                    Email::try_from(uid)
-                        .map(|email| email != *unlink_email)
-                        .unwrap_or(false)
-                })?;
-            }
+        if let Some(current_fpr) = current_link_fpr
+            && current_fpr != *fpr_primary
+        {
+            self.nolock_set_email_unpublished_filter(&current_fpr, |uid| {
+                Email::try_from(uid)
+                    .map(|email| email != *unlink_email)
+                    .unwrap_or(false)
+            })?;
         }
         Ok(())
     }
@@ -563,16 +576,14 @@ pub trait Database: Sync + Send {
 
         let published_emails_old: Vec<Email> = published_tpk_old
             .userids()
-            .map(|binding| Email::try_from(binding.userid()))
-            .flatten()
+            .flat_map(|binding| Email::try_from(binding.userid()))
             .collect();
 
         let published_tpk_new = published_tpk_old.retain_userids(|uid| email_remove(uid.userid()));
 
         let published_emails_new: Vec<Email> = published_tpk_new
             .userids()
-            .map(|binding| Email::try_from(binding.userid()))
-            .flatten()
+            .flat_map(|binding| Email::try_from(binding.userid()))
             .collect();
 
         let unpublished_emails = published_emails_old
@@ -591,7 +602,7 @@ pub trait Database: Sync + Send {
             if let Err(e) = self.unlink_email(unpublished_email, fpr_primary) {
                 info!(
                     "Error deleting email symlink! {} -> {} {:?}",
-                    &unpublished_email, &fpr_primary, e
+                    unpublished_email, fpr_primary, e
                 );
             }
         }
@@ -619,8 +630,7 @@ pub trait Database: Sync + Send {
 
         let published_emails: Vec<Email> = tpk
             .userids()
-            .map(|binding| Email::try_from(binding.userid()))
-            .flatten()
+            .flat_map(|binding| Email::try_from(binding.userid()))
             .collect();
 
         self.regenerate_wkd(fpr_primary, &tpk)?;
@@ -670,8 +680,7 @@ pub trait Database: Sync + Send {
 
 fn tpk_get_emails(cert: &Cert) -> Vec<Email> {
     cert.userids()
-        .map(|binding| Email::try_from(binding.userid()))
-        .flatten()
+        .flat_map(|binding| Email::try_from(binding.userid()))
         .collect()
 }
 
@@ -679,7 +688,6 @@ pub fn tpk_get_linkable_fprs(tpk: &Cert) -> Vec<Fingerprint> {
     let signing_capable = &KeyFlags::empty().set_signing().set_certification();
     let fpr_primary = &Fingerprint::try_from(tpk.fingerprint()).unwrap();
     tpk.keys()
-        .into_iter()
         .flat_map(|bundle| {
             Fingerprint::try_from(bundle.key().fingerprint()).map(|fpr| {
                 (

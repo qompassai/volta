@@ -1,0 +1,39 @@
+{{!-- First-party page written for Volta (Qompass AI, 2026). --}}
+{{#> layout }}
+  <h2>{{ text "Frequently Asked Questions" }}</h2>
+
+  <h3>How do I publish my key?</h3>
+  <p>
+    Upload it on the <a href="/upload">upload page</a> (or with
+    <code>gpg --keyserver hkps://volta.qompass.ai --send-keys &lt;key-id&gt;</code>),
+    then confirm each address you want listed by following the link in the
+    verification email.
+  </p>
+
+  <h3>Why is my address not showing up?</h3>
+  <p>
+    Addresses are listed only after verification. Check your inbox (and
+    spam folder) for the confirmation email, or request a new one from the
+    upload page.
+  </p>
+
+  <h3>How do I remove my key or an address?</h3>
+  <p>
+    Use the <a href="/manage">manage page</a>: enter a verified address,
+    follow the link in the email you receive, and unpublish the addresses
+    you no longer want listed.
+  </p>
+
+  <h3>Can I upload someone else's key?</h3>
+  <p>
+    You can upload any public key, but only its owner can verify addresses
+    for it, so an uploaded key stays undiscoverable by address until the
+    owner confirms it.
+  </p>
+
+  <h3>Does Volta hold private keys?</h3>
+  <p>
+    No. Volta stores and serves public key material only. Secret keys are
+    actively rejected at upload.
+  </p>
+{{/layout}}

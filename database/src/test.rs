@@ -1,3 +1,21 @@
+// #################################################################
+// /qompassai/volta/database/src/test.rs
+// Qompass AI Test
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Qompass AI
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 // pub, fetch by fpr, verify no uid
 // verify uid fetch by fpr fetch by uid
 // verify again
@@ -18,24 +36,24 @@ use anyhow::Result;
 use std::convert::{TryFrom, TryInto};
 use std::str::FromStr;
 
+use crate::Database;
+use crate::Query;
+use crate::types::{Email, Fingerprint, KeyID};
 use openpgp::cert::{CertBuilder, UserIDRevocationBuilder};
 use openpgp::types::{KeyFlags, ReasonForRevocation, SignatureType};
 use openpgp::{
-    packet::{signature::*, UserID},
+    Cert, Packet,
+    packet::{UserID, signature::*},
     parse::Parse,
     types::RevocationStatus,
-    Cert, Packet,
 };
 use std::fs;
 use std::path::Path;
-use types::{Email, Fingerprint, KeyID};
-use Database;
-use Query;
 
-use openpgp_utils::POLICY;
+use crate::openpgp_utils::POLICY;
 
-use EmailAddressStatus;
-use TpkStatus;
+use crate::EmailAddressStatus;
+use crate::TpkStatus;
 
 fn check_mail_none(db: &impl Database, email: &Email) {
     assert!(db.by_email(email).is_none());
@@ -107,7 +125,7 @@ pub fn test_uid_verification(db: &mut impl Database, log_path: &Path) {
         let uid = key.userids().next().unwrap().userid().clone();
 
         assert!((uid == uid1) ^ (uid == uid2));
-        let email = Email::from_str(&String::from_utf8(uid.value().to_vec()).unwrap()).unwrap();
+        let email = Email::from_str(core::str::from_utf8(uid.value()).unwrap()).unwrap();
         assert_eq!(db.by_email(&email).unwrap(), raw);
 
         if email1 == email {
@@ -135,7 +153,7 @@ pub fn test_uid_verification(db: &mut impl Database, log_path: &Path) {
         let uid = key.userids().next().unwrap().userid().clone();
 
         assert!((uid == uid1) ^ (uid == uid2));
-        let email = Email::from_str(&String::from_utf8(uid.value().to_vec()).unwrap()).unwrap();
+        let email = Email::from_str(core::str::from_utf8(uid.value()).unwrap()).unwrap();
         assert_eq!(db.by_email(&email).unwrap(), raw);
 
         if email1 == email {
@@ -224,7 +242,7 @@ pub fn test_uid_verification(db: &mut impl Database, log_path: &Path) {
             .into_children()
             .filter(|pkt| {
                 match pkt {
-                    Packet::UserID(ref uid) => *uid != uid1,
+                    Packet::UserID(uid) => *uid != uid1,
                     _ => true,
                 }
             })
@@ -1339,8 +1357,9 @@ pub fn attested_key_signatures(db: &mut impl Database, log_path: &Path) -> Resul
     )?;
 
     // Have Bob attest that certification.
-    let attestations = bob.userids().next().unwrap().attest_certifications(
+    let attestations = bob.userids().next().unwrap().attest_certifications2(
         &POLICY,
+        t1,
         &mut bob_signer,
         vec![&alice_certifies_bob],
     )?;
@@ -1404,7 +1423,7 @@ pub fn attested_key_signatures(db: &mut impl Database, log_path: &Path) -> Resul
         .userids()
         .next()
         .unwrap()
-        .attest_certifications(&POLICY, &mut bob_signer, &[])?;
+        .attest_certifications2(&POLICY, t1, &mut bob_signer, &[])?;
     assert_eq!(attestations.len(), 1);
     let clear_attestation = attestations[0].clone();
 
@@ -1458,7 +1477,13 @@ pub fn attested_key_signatures(db: &mut impl Database, log_path: &Path) -> Resul
 
 fn check_log_entry(log_path: &Path, fpr: &Fingerprint) {
     let log_data = fs::read_to_string(log_path).unwrap();
-    let last_entry = log_data.lines().last().unwrap().split(' ').last().unwrap();
+    let last_entry = log_data
+        .lines()
+        .last()
+        .unwrap()
+        .split(' ')
+        .next_back()
+        .unwrap();
     assert_eq!(last_entry, fpr.to_string());
 }
 
@@ -1467,7 +1492,7 @@ fn cert_without_uid(cert: Cert, removed_uid: &UserID) -> Cert {
         .into_packet_pile()
         .into_children()
         .filter(|pkt| match pkt {
-            Packet::UserID(ref uid) => uid != removed_uid,
+            Packet::UserID(uid) => uid != removed_uid,
             _ => true,
         });
     Cert::from_packets(packets).unwrap()

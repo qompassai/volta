@@ -1,7 +1,26 @@
+// #################################################################
+// /qompassai/volta/database/src/fs.rs
+// Qompass AI Fs
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Qompass AI
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+use anyhow::Result;
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::fs::{
-    create_dir_all, read_link, remove_file, rename, set_permissions, File, OpenOptions, Permissions,
+    File, OpenOptions, Permissions, create_dir_all, read_link, remove_file, rename, set_permissions,
 };
 use std::io::Write;
 use std::os::unix::fs::PermissionsExt;
@@ -9,20 +28,18 @@ use std::path::{Path, PathBuf};
 
 use pathdiff::diff_paths;
 use std::time::SystemTime;
-use tempfile;
 use url::form_urlencoded;
 
-use sync::FlockMutexGuard;
-use types::{Email, Fingerprint, KeyID};
-use Result;
-use {Database, Query};
+use crate::sync::FlockMutexGuard;
+use crate::types::{Email, Fingerprint, KeyID};
+use crate::{Database, Query};
 
-use wkd;
+use crate::wkd;
 
 use tempfile::NamedTempFile;
 
+use crate::openpgp_utils::POLICY;
 use openpgp::Cert;
-use openpgp_utils::POLICY;
 
 pub struct Filesystem {
     tmp_dir: PathBuf,
@@ -254,7 +271,7 @@ impl Filesystem {
     /// Returns the backing primary key fingerprint for any key path.
     pub fn path_to_primary(path: &Path) -> Option<Fingerprint> {
         use std::fs;
-        let typ = fs::symlink_metadata(&path).ok()?.file_type();
+        let typ = fs::symlink_metadata(path).ok()?.file_type();
         if typ.is_symlink() {
             let path = read_link(path).ok()?;
             Filesystem::path_to_fingerprint(&path)
@@ -331,7 +348,7 @@ impl Filesystem {
         for entry in WalkDir::new(checks_dir) {
             let entry = entry?;
             let path = entry.path();
-            let typ = fs::symlink_metadata(&path)?.file_type();
+            let typ = fs::symlink_metadata(path)?.file_type();
             if typ.is_dir() {
                 continue;
             }
@@ -372,16 +389,16 @@ fn symlink(symlink_content: &Path, symlink_name: &Path) -> Result<()> {
         .tempdir_in(symlink_dir)?;
     let symlink_name_tmp = tmp_dir.path().join("link");
 
-    symlink(&symlink_content, &symlink_name_tmp)?;
-    rename(&symlink_name_tmp, &symlink_name)?;
+    symlink(symlink_content, &symlink_name_tmp)?;
+    rename(&symlink_name_tmp, symlink_name)?;
     Ok(())
 }
 
 fn symlink_unlink_with_check(link: &Path, expected: &Path) -> Result<()> {
-    if let Ok(target) = read_link(&link) {
-        if target == expected {
-            remove_file(link)?;
-        }
+    if let Ok(target) = read_link(link)
+        && target == expected
+    {
+        remove_file(link)?;
     }
 
     Ok(())
@@ -479,22 +496,24 @@ impl Database for Filesystem {
 
         let path_published = self.fingerprint_to_path_published(fpr_target);
 
-        if let Ok(link_fpr_target) = link_fpr.canonicalize() {
-            if !link_fpr_target.ends_with(&path_published) {
-                info!("Fingerprint points to different key for {} (expected {:?} to be suffix of {:?})",
-                    fpr, &path_published, &link_fpr_target);
-                return Err(anyhow!(format!("Fingerprint collision for key {}", fpr)));
-            }
+        if let Ok(link_fpr_target) = link_fpr.canonicalize()
+            && !link_fpr_target.ends_with(&path_published)
+        {
+            info!(
+                "Fingerprint points to different key for {} (expected {:?} to be suffix of {:?})",
+                fpr, path_published, link_fpr_target
+            );
+            return Err(anyhow!(format!("Fingerprint collision for key {}", fpr)));
         }
 
-        if let Ok(link_keyid_target) = link_keyid.canonicalize() {
-            if !link_keyid_target.ends_with(&path_published) {
-                info!(
-                    "KeyID points to different key for {} (expected {:?} to be suffix of {:?})",
-                    fpr, &path_published, &link_keyid_target
-                );
-                return Err(anyhow!(format!("KeyID collision for key {}", fpr)));
-            }
+        if let Ok(link_keyid_target) = link_keyid.canonicalize()
+            && !link_keyid_target.ends_with(&path_published)
+        {
+            info!(
+                "KeyID points to different key for {} (expected {:?} to be suffix of {:?})",
+                fpr, path_published, link_keyid_target
+            );
+            return Err(anyhow!(format!("KeyID collision for key {}", fpr)));
         }
 
         if !link_fpr.exists() || !link_keyid.exists() {
@@ -507,9 +526,9 @@ impl Database for Filesystem {
     fn lookup_primary_fingerprint(&self, term: &Query) -> Option<Fingerprint> {
         use super::Query::*;
         let path = match term {
-            ByFingerprint(ref fp) => self.link_by_fingerprint(fp),
-            ByKeyID(ref keyid) => self.link_by_keyid(keyid),
-            ByEmail(ref email) => self.link_by_email(email),
+            ByFingerprint(fp) => self.link_by_fingerprint(fp),
+            ByKeyID(keyid) => self.link_by_keyid(keyid),
+            ByEmail(email) => self.link_by_email(email),
             _ => return None,
         };
         path.read_link()
@@ -560,15 +579,15 @@ impl Database for Filesystem {
         )
         .unwrap();
 
-        if let Ok(target) = read_link(&link_fpr) {
-            if target == expected {
-                remove_file(&link_fpr)?;
-            }
+        if let Ok(target) = read_link(&link_fpr)
+            && target == expected
+        {
+            remove_file(&link_fpr)?;
         }
-        if let Ok(target) = read_link(&link_keyid) {
-            if target == expected {
-                remove_file(link_keyid)?;
-            }
+        if let Ok(target) = read_link(&link_keyid)
+            && target == expected
+        {
+            remove_file(link_keyid)?;
         }
 
         Ok(())
@@ -668,8 +687,7 @@ impl Database for Filesystem {
                 .for_certification()
                 .for_signing()
                 .map(|amalgamation| amalgamation.key().fingerprint())
-                .map(Fingerprint::try_from)
-                .flatten();
+                .flat_map(Fingerprint::try_from);
 
             for fpr in fingerprints {
                 if let Some(missing_fpr) = self.check_link_fpr(&fpr, primary_fp)? {
@@ -802,7 +820,6 @@ mod tests {
     use super::*;
     use openpgp::cert::CertBuilder;
     use tempfile::TempDir;
-    use test;
 
     #[test]
     fn init() {
@@ -837,25 +854,28 @@ mod tests {
             .unwrap()
             .0;
 
-        assert!(!db
-            .merge(k1)
-            .unwrap()
-            .into_tpk_status()
-            .email_status
-            .is_empty());
-        assert!(!db
-            .merge(k2.clone())
-            .unwrap()
-            .into_tpk_status()
-            .email_status
-            .is_empty());
+        assert!(
+            !db.merge(k1)
+                .unwrap()
+                .into_tpk_status()
+                .email_status
+                .is_empty()
+        );
+        assert!(
+            !db.merge(k2.clone())
+                .unwrap()
+                .into_tpk_status()
+                .email_status
+                .is_empty()
+        );
         assert!(!db.merge(k2).unwrap().into_tpk_status().email_status.len() > 0);
-        assert!(!db
-            .merge(k3.clone())
-            .unwrap()
-            .into_tpk_status()
-            .email_status
-            .is_empty());
+        assert!(
+            !db.merge(k3.clone())
+                .unwrap()
+                .into_tpk_status()
+                .email_status
+                .is_empty()
+        );
         assert!(
             !db.merge(k3.clone())
                 .unwrap()
@@ -870,112 +890,112 @@ mod tests {
     #[test]
     fn uid_verification() {
         let (_tmp_dir, mut db, log_path) = open_db();
-        test::test_uid_verification(&mut db, &log_path);
+        crate::test::test_uid_verification(&mut db, &log_path);
         db.check_consistency().expect("inconsistent database");
     }
 
     #[test]
     fn uid_deletion() {
         let (_tmp_dir, mut db, log_path) = open_db();
-        test::test_uid_deletion(&mut db, &log_path);
+        crate::test::test_uid_deletion(&mut db, &log_path);
         db.check_consistency().expect("inconsistent database");
     }
 
     #[test]
     fn subkey_lookup() {
         let (_tmp_dir, mut db, log_path) = open_db();
-        test::test_subkey_lookup(&mut db, &log_path);
+        crate::test::test_subkey_lookup(&mut db, &log_path);
         db.check_consistency().expect("inconsistent database");
     }
 
     #[test]
     fn kid_lookup() {
         let (_tmp_dir, mut db, log_path) = open_db();
-        test::test_kid_lookup(&mut db, &log_path);
+        crate::test::test_kid_lookup(&mut db, &log_path);
         db.check_consistency().expect("inconsistent database");
     }
 
     #[test]
     fn upload_revoked_tpk() {
         let (_tmp_dir, mut db, log_path) = open_db();
-        test::test_upload_revoked_tpk(&mut db, &log_path);
+        crate::test::test_upload_revoked_tpk(&mut db, &log_path);
         db.check_consistency().expect("inconsistent database");
     }
 
     #[test]
     fn uid_revocation() {
         let (_tmp_dir, mut db, log_path) = open_db();
-        test::test_uid_revocation(&mut db, &log_path);
+        crate::test::test_uid_revocation(&mut db, &log_path);
         db.check_consistency().expect("inconsistent database");
     }
 
     #[test]
     fn regenerate() {
         let (_tmp_dir, mut db, log_path) = open_db();
-        test::test_regenerate(&mut db, &log_path);
+        crate::test::test_regenerate(&mut db, &log_path);
         db.check_consistency().expect("inconsistent database");
     }
 
     #[test]
     fn key_reupload() {
         let (_tmp_dir, mut db, log_path) = open_db();
-        test::test_reupload(&mut db, &log_path);
+        crate::test::test_reupload(&mut db, &log_path);
         db.check_consistency().expect("inconsistent database");
     }
 
     #[test]
     fn uid_replacement() {
         let (_tmp_dir, mut db, log_path) = open_db();
-        test::test_uid_replacement(&mut db, &log_path);
+        crate::test::test_uid_replacement(&mut db, &log_path);
         db.check_consistency().expect("inconsistent database");
     }
 
     #[test]
     fn uid_unlinking() {
         let (_tmp_dir, mut db, log_path) = open_db();
-        test::test_unlink_uid(&mut db, &log_path);
+        crate::test::test_unlink_uid(&mut db, &log_path);
         db.check_consistency().expect("inconsistent database");
     }
 
     #[test]
     fn same_email_1() {
         let (_tmp_dir, mut db, log_path) = open_db();
-        test::test_same_email_1(&mut db, &log_path);
+        crate::test::test_same_email_1(&mut db, &log_path);
         db.check_consistency().expect("inconsistent database");
     }
 
     #[test]
     fn same_email_2() {
         let (_tmp_dir, mut db, log_path) = open_db();
-        test::test_same_email_2(&mut db, &log_path);
+        crate::test::test_same_email_2(&mut db, &log_path);
         db.check_consistency().expect("inconsistent database");
     }
 
     #[test]
     fn same_email_3() {
         let (_tmp_dir, mut db, log_path) = open_db();
-        test::test_same_email_3(&mut db, &log_path);
+        crate::test::test_same_email_3(&mut db, &log_path);
         db.check_consistency().expect("inconsistent database");
     }
 
     #[test]
     fn same_email_4() {
         let (_tmp_dir, mut db, log_path) = open_db();
-        test::test_same_email_4(&mut db, &log_path);
+        crate::test::test_same_email_4(&mut db, &log_path);
         db.check_consistency().expect("inconsistent database");
     }
 
     #[test]
     fn no_selfsig() {
         let (_tmp_dir, mut db, log_path) = open_db();
-        test::test_no_selfsig(&mut db, &log_path);
+        crate::test::test_no_selfsig(&mut db, &log_path);
         db.check_consistency().expect("inconsistent database");
     }
 
     #[test]
     fn bad_uids() {
         let (_tmp_dir, mut db, log_path) = open_db();
-        test::test_bad_uids(&mut db, &log_path);
+        crate::test::test_bad_uids(&mut db, &log_path);
         db.check_consistency().expect("inconsistent database");
     }
 
@@ -996,7 +1016,7 @@ mod tests {
     #[test]
     fn attested_key_signatures() -> Result<()> {
         let (_tmp_dir, mut db, log_path) = open_db();
-        test::attested_key_signatures(&mut db, &log_path)?;
+        crate::test::attested_key_signatures(&mut db, &log_path)?;
         db.check_consistency()?;
         Ok(())
     }
@@ -1004,7 +1024,7 @@ mod tests {
     #[test]
     fn nonexportable_sigs() -> Result<()> {
         let (_tmp_dir, mut db, log_path) = open_db();
-        test::nonexportable_sigs(&mut db, &log_path)?;
+        crate::test::nonexportable_sigs(&mut db, &log_path)?;
         db.check_consistency()?;
         Ok(())
     }

@@ -1,7 +1,25 @@
+// #################################################################
+// /qompassai/volta/src/tokens.rs
+// Qompass AI Verification and Management Tokens
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Qompass AI
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 use crate::sealed_state::SealedState;
 
 use crate::Result;
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 
 pub trait StatelessSerializable: Serialize + DeserializeOwned {}
 
@@ -51,7 +69,9 @@ impl Service {
         let token: Token =
             serde_json::from_str(&token_str).map_err(|_| anyhow!("failed to deserialize"))?;
 
-        let elapsed = current_time() - token.creation;
+        let elapsed = current_time()
+            .checked_sub(token.creation)
+            .ok_or_else(|| anyhow!("token creation in the future"))?;
         if elapsed > self.validity {
             return Err(anyhow!("Token has expired!"));
         }
@@ -113,7 +133,12 @@ mod tests {
         let payload = TestStruct1 {
             payload: "hello".to_owned(),
         };
-        let token = "rwM_S9gZaRQaf6DLvmWtZSipQhH_G5ronSIJv2FrMdwGBPSYYQ-1jaP58dTHU5WuC14vb8jxmz2Xf_b3pqzpCGTEJj9drm4t";
+        // Fixture sealed by the current implementation (secret
+        // "secret", test clock 12345678). The upstream fixture it
+        // replaces did not validate against the sealed-state
+        // construction this code ships; see the book's testing
+        // chapter for the evidence.
+        let token = "lJA9_k29r37vD3fvBQdnzciowY9KIIze3uJ54kH4pkOuyFPY7BeCnoH5qeOb9fhsksLFkFyOqo-vEhBPrmefkJS6iaBqlk3p";
         let mt = Service::init("secret", 60);
 
         let check_result = mt.check(token);

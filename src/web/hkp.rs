@@ -1,13 +1,31 @@
+// #################################################################
+// /qompassai/volta/src/web/hkp.rs
+// Qompass AI Hkp
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Qompass AI
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 use std::fmt;
 
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::time::SystemTime;
 
-use rocket::http::ContentType;
+use crate::i18n::I18n;
 use rocket::Data;
-use rocket_i18n::I18n;
-use url::percent_encoding::{utf8_percent_encode, DEFAULT_ENCODE_SET};
+use rocket::http::ContentType;
+use url::percent_encoding::{DEFAULT_ENCODE_SET, utf8_percent_encode};
 
 use crate::database::types::{Email, Fingerprint, KeyID};
 use crate::database::{Database, KeyDatabase, Query};
@@ -21,7 +39,7 @@ use crate::mail;
 use crate::web;
 use crate::web::vks::response::EmailStatus;
 use crate::web::vks::response::UploadResponse;
-use crate::web::{vks_web, MyResponse, RequestOrigin};
+use crate::web::{MyResponse, RequestOrigin, vks_web};
 
 #[derive(Debug)]
 pub enum Hkp {
@@ -34,10 +52,10 @@ pub enum Hkp {
 impl fmt::Display for Hkp {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Hkp::Fingerprint { ref fpr, .. } => write!(f, "{}", fpr),
-            Hkp::KeyID { ref keyid, .. } => write!(f, "{}", keyid),
-            Hkp::Email { ref email, .. } => write!(f, "{}", email),
-            Hkp::ShortKeyID { ref query, .. } => write!(f, "{}", query),
+            Hkp::Fingerprint { fpr, .. } => write!(f, "{}", fpr),
+            Hkp::KeyID { keyid, .. } => write!(f, "{}", keyid),
+            Hkp::Email { email, .. } => write!(f, "{}", email),
+            Hkp::ShortKeyID { query, .. } => write!(f, "{}", query),
         }
     }
 }
@@ -121,7 +139,10 @@ pub async fn pks_add_form(
             MyResponse::plain(msg)
         }
         Ok(_) => {
-            let msg = format!("Upload successful. Please note that identity information will only be published after verification. See {baseuri}/about/usage#gnupg-upload", baseuri = origin.get_base_uri());
+            let msg = format!(
+                "Upload successful. Please note that identity information will only be published after verification. See {baseuri}/about/usage#gnupg-upload",
+                baseuri = origin.get_base_uri()
+            );
             MyResponse::plain(msg)
         }
         Err(err) => MyResponse::ise(err),
@@ -139,17 +160,23 @@ fn pks_add_ok(
     primary_uid: Option<Email>,
 ) -> String {
     if primary_uid.is_none() {
-        return format!("Upload successful. Please note that identity information will only be published after verification. See {baseuri}/about/usage#gnupg-upload", baseuri = origin.get_base_uri());
+        return format!(
+            "Upload successful. Please note that identity information will only be published after verification. See {baseuri}/about/usage#gnupg-upload",
+            baseuri = origin.get_base_uri()
+        );
     }
     let primary_uid = primary_uid.unwrap();
 
     if is_new_key {
         if send_welcome_mail(origin, mail_service, key_fpr, &primary_uid, token) {
-            rate_limiter.action_perform(format!("hkp-sent-{}", &primary_uid));
+            rate_limiter.action_perform(format!("hkp-sent-{}", primary_uid));
             return "Upload successful. This is a new key, a welcome email has been sent."
                 .to_string();
         }
-        return format!("Upload successful. Please note that identity information will only be published after verification. See {baseuri}/about/usage#gnupg-upload", baseuri = origin.get_base_uri());
+        return format!(
+            "Upload successful. Please note that identity information will only be published after verification. See {baseuri}/about/usage#gnupg-upload",
+            baseuri = origin.get_base_uri()
+        );
     }
 
     let has_unverified = status.iter().any(|(_, v)| *v == EmailStatus::Unpublished);
@@ -157,7 +184,10 @@ fn pks_add_ok(
         return "Upload successful.".to_string();
     }
 
-    return format!("Upload successful. Please note that identity information will only be published after verification. See {baseuri}/about/usage#gnupg-upload", baseuri = origin.get_base_uri());
+    format!(
+        "Upload successful. Please note that identity information will only be published after verification. See {baseuri}/about/usage#gnupg-upload",
+        baseuri = origin.get_base_uri()
+    )
 }
 
 fn send_welcome_mail(
@@ -188,7 +218,7 @@ pub fn pks_lookup(
         Hkp::Fingerprint { fpr } => Query::ByFingerprint(fpr),
         Hkp::KeyID { keyid } => Query::ByKeyID(keyid),
         Hkp::Email { email } => Query::ByEmail(email),
-        Hkp::ShortKeyID { query: _, .. } => {
+        Hkp::ShortKeyID { .. } => {
             return MyResponse::bad_request_plain(
                 "Search by short key ids is not supported, sorry!",
             );

@@ -1,20 +1,38 @@
+// #################################################################
+// /qompassai/volta/src/dump.rs
+// Qompass AI Dump
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Qompass AI
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 use std::io::{self, Read};
 
 use self::openpgp::crypto::mpi;
-use self::openpgp::crypto::{SessionKey, S2K};
+use self::openpgp::crypto::{S2K, SessionKey};
 use self::openpgp::fmt::hex;
 use self::openpgp::packet::header::CTB;
 use self::openpgp::packet::prelude::*;
 use self::openpgp::packet::signature::subpacket::{Subpacket, SubpacketValue};
-use self::openpgp::packet::{header::BodyLength, Header, Signature};
-use self::openpgp::parse::{map::Map, PacketParserResult, Parse};
+use self::openpgp::packet::{Header, Signature, header::BodyLength};
+use self::openpgp::parse::{PacketParserResult, Parse, map::Map};
 use self::openpgp::types::{Duration, SymmetricAlgorithm, Timestamp};
 use self::openpgp::{Packet, Result};
 use sequoia_openpgp as openpgp;
 
 #[derive(Debug)]
 pub enum Kind {
-    Message { encrypted: bool },
+    Message,
     Keyring,
     Cert,
     Unknown,
@@ -65,7 +83,6 @@ where
     let mut ppr = self::openpgp::parse::PacketParserBuilder::from_reader(input)?
         .map(hex)
         .build()?;
-    let mut message_encrypted = false;
     let width = width.into().unwrap_or(80);
     let mut dumper = PacketDumper::new(width, mpis);
 
@@ -80,12 +97,8 @@ where
                     if n == prefix.len() { "..." } else { "" }
                 )])
             }
-            Packet::SEIP(_) if sk.is_none() => {
-                message_encrypted = true;
-                Some(vec!["No session key supplied".into()])
-            }
+            Packet::SEIP(_) if sk.is_none() => Some(vec!["No session key supplied".into()]),
             Packet::SEIP(_) if sk.is_some() => {
-                message_encrypted = true;
                 let sk = sk.as_ref().unwrap();
                 let mut decrypted_with = None;
                 for algo in 1..20 {
@@ -113,12 +126,8 @@ where
                 }
                 Some(fields)
             }
-            Packet::AED(_) if sk.is_none() => {
-                message_encrypted = true;
-                Some(vec!["No session key supplied".into()])
-            }
+            Packet::AED(_) if sk.is_none() => Some(vec!["No session key supplied".into()]),
             Packet::AED(_) if sk.is_some() => {
-                message_encrypted = true;
                 let sk = sk.as_ref().unwrap();
                 let algo = if let Packet::AED(ref aed) = pp.packet {
                     aed.symmetric_algo()
@@ -130,7 +139,7 @@ where
 
                 let mut fields = Vec::new();
                 fields.push(format!("Session key: {}", hex::encode(sk)));
-                if pp.encrypted() {
+                if !pp.processed() {
                     fields.push("Decryption failed".into());
                 } else {
                     fields.push("Decryption successful".into());
@@ -169,9 +178,7 @@ where
 
     if let PacketParserResult::EOF(eof) = ppr {
         if eof.is_message().is_ok() {
-            Ok(Kind::Message {
-                encrypted: message_encrypted,
-            })
+            Ok(Kind::Message)
         } else if eof.is_cert().is_ok() {
             Ok(Kind::Cert)
         } else if eof.is_keyring().is_ok() {
@@ -294,6 +301,10 @@ impl PacketDumper {
         Ok(())
     }
 
+    // Describing legacy packets and subpackets (MDC,
+    // PreferredAEADAlgorithms) found in old keys is this tool's
+    // purpose; sequoia deprecates producing them, not reading them.
+    #[allow(deprecated)]
     fn dump_packet(
         &self,
         mut output: &mut dyn io::Write,
@@ -434,7 +445,7 @@ impl PacketDumper {
 
                 let ii = format!("{}    ", i);
                 match secrets {
-                    SecretKeyMaterial::Unencrypted(ref u) => {
+                    SecretKeyMaterial::Unencrypted(u) => {
                         writeln!(output, "{}", i)?;
                         writeln!(output, "{}  Unencrypted", ii)?;
                         if pd.mpis {
@@ -489,16 +500,16 @@ impl PacketDumper {
                             })?;
                         }
                     }
-                    SecretKeyMaterial::Encrypted(ref e) => {
+                    SecretKeyMaterial::Encrypted(e) => {
                         writeln!(output, "{}", i)?;
                         writeln!(output, "{}  Encrypted", ii)?;
                         write!(output, "{}  S2K: ", ii)?;
                         pd.dump_s2k(output, &ii, e.s2k())?;
                         writeln!(output, "{}  Sym. algo: {}", ii, e.algo())?;
-                        if pd.mpis {
-                            if let Ok(ciphertext) = e.ciphertext() {
-                                pd.dump_mpis(output, &ii, &[ciphertext], &["ciphertext"])?;
-                            }
+                        if pd.mpis
+                            && let Ok(ciphertext) = e.ciphertext()
+                        {
+                            pd.dump_mpis(output, &ii, &[ciphertext], &["ciphertext"])?;
                         }
                     }
                 }
@@ -508,17 +519,17 @@ impl PacketDumper {
         }
 
         match p {
-            Unknown(ref u) => {
+            Unknown(u) => {
                 writeln!(output, "{}  Tag: {}", i, u.tag())?;
                 writeln!(output, "{}  Error: {}", i, u.error())?;
             }
 
-            PublicKey(ref k) => dump_key(self, output, i, k)?,
-            PublicSubkey(ref k) => dump_key(self, output, i, k)?,
-            SecretKey(ref k) => dump_key(self, output, i, k)?,
-            SecretSubkey(ref k) => dump_key(self, output, i, k)?,
+            PublicKey(k) => dump_key(self, output, i, k)?,
+            PublicSubkey(k) => dump_key(self, output, i, k)?,
+            SecretKey(k) => dump_key(self, output, i, k)?,
+            SecretSubkey(k) => dump_key(self, output, i, k)?,
 
-            Signature(ref s) => {
+            Signature(s) => {
                 writeln!(output, "{}  Version: {}", i, s.version())?;
                 writeln!(output, "{}  Type: {}", i, s.typ())?;
                 writeln!(output, "{}  Pk algo: {}", i, s.pk_algo())?;
@@ -599,7 +610,7 @@ impl PacketDumper {
                 }
             }
 
-            OnePassSig(ref o) => {
+            OnePassSig(o) => {
                 writeln!(output, "{}  Version: {}", i, o.version())?;
                 writeln!(output, "{}  Type: {}", i, o.typ())?;
                 writeln!(output, "{}  Pk algo: {}", i, o.pk_algo())?;
@@ -608,7 +619,7 @@ impl PacketDumper {
                 writeln!(output, "{}  Last: {}", i, o.last())?;
             }
 
-            Trust(ref p) => {
+            Trust(p) => {
                 writeln!(output, "{}  Value:", i)?;
                 let mut hd = hex::Dumper::new(
                     &mut output,
@@ -617,7 +628,7 @@ impl PacketDumper {
                 hd.write_ascii(p.value())?;
             }
 
-            UserID(ref u) => {
+            UserID(u) => {
                 writeln!(
                     output,
                     "{}  Value: {}",
@@ -626,7 +637,7 @@ impl PacketDumper {
                 )?;
             }
 
-            UserAttribute(ref u) => {
+            UserAttribute(u) => {
                 use self::openpgp::packet::user_attribute::{Image, Subpacket};
 
                 for subpacket in u.subpackets() {
@@ -664,7 +675,7 @@ impl PacketDumper {
 
             Marker(_) => {}
 
-            Literal(ref l) => {
+            Literal(l) => {
                 writeln!(output, "{}  Format: {}", i, l.format())?;
                 if let Some(filename) = l.filename() {
                     writeln!(
@@ -679,11 +690,11 @@ impl PacketDumper {
                 }
             }
 
-            CompressedData(ref c) => {
+            CompressedData(c) => {
                 writeln!(output, "{}  Algorithm: {}", i, c.algo())?;
             }
 
-            PKESK(ref p) => {
+            PKESK(p) => {
                 writeln!(output, "{}  Version: {}", i, p.version())?;
                 writeln!(output, "{}  Recipient: {}", i, p.recipient())?;
                 writeln!(output, "{}  Pk algo: {}", i, p.pk_algo())?;
@@ -724,10 +735,10 @@ impl PacketDumper {
                 }
             }
 
-            SKESK(ref s) => {
+            SKESK(s) => {
                 writeln!(output, "{}  Version: {}", i, s.version())?;
                 match s {
-                    self::openpgp::packet::SKESK::V4(ref s) => {
+                    self::openpgp::packet::SKESK::V4(s) => {
                         writeln!(output, "{}  Symmetric algo: {}", i, s.symmetric_algo())?;
                         write!(output, "{}  S2K: ", i)?;
                         self.dump_s2k(output, i, s.s2k())?;
@@ -736,7 +747,7 @@ impl PacketDumper {
                         }
                     }
 
-                    self::openpgp::packet::SKESK::V5(ref s) => {
+                    self::openpgp::packet::SKESK::V5(s) => {
                         writeln!(output, "{}  Symmetric algo: {}", i, s.symmetric_algo())?;
                         writeln!(output, "{}  AEAD: {}", i, s.aead_algo())?;
                         write!(output, "{}  S2K: ", i)?;
@@ -755,11 +766,11 @@ impl PacketDumper {
                 }
             }
 
-            SEIP(ref s) => {
+            SEIP(s) => {
                 writeln!(output, "{}  Version: {}", i, s.version())?;
             }
 
-            MDC(ref m) => {
+            MDC(m) => {
                 writeln!(output, "{}  Digest: {}", i, hex::encode(m.digest()))?;
                 writeln!(
                     output,
@@ -769,7 +780,7 @@ impl PacketDumper {
                 )?;
             }
 
-            AED(ref a) => {
+            AED(a) => {
                 writeln!(output, "{}  Version: {}", i, a.version())?;
                 writeln!(output, "{}  Symmetric algo: {}", i, a.symmetric_algo())?;
                 writeln!(output, "{}  AEAD: {}", i, a.aead())?;
@@ -823,6 +834,10 @@ impl PacketDumper {
         Ok(())
     }
 
+    // Describing legacy packets and subpackets (MDC,
+    // PreferredAEADAlgorithms) found in old keys is this tool's
+    // purpose; sequoia deprecates producing them, not reading them.
+    #[allow(deprecated)]
     fn dump_subpacket(
         &self,
         output: &mut dyn io::Write,
@@ -879,7 +894,7 @@ impl PacketDumper {
                 "{}    Trust signature: level {} trust {}",
                 i, level, trust
             )?,
-            RegularExpression(ref r) => write!(
+            RegularExpression(r) => write!(
                 output,
                 "{}    Regular expression: {}",
                 i,
@@ -889,7 +904,7 @@ impl PacketDumper {
             KeyExpirationTime(t) => {
                 write!(output, "{}    Key expiration time: {}", i, t.convert())?
             }
-            PreferredSymmetricAlgorithms(ref c) => write!(
+            PreferredSymmetricAlgorithms(c) => write!(
                 output,
                 "{}    Symmetric algo preferences: {}",
                 i,
@@ -905,7 +920,7 @@ impl PacketDumper {
                     write!(output, ", sensitive")?;
                 }
             }
-            Issuer(ref is) => write!(output, "{}    Issuer: {}", i, is)?,
+            Issuer(is) => write!(output, "{}    Issuer: {}", i, is)?,
             NotationData(n) => {
                 if n.flags().human_readable() {
                     write!(output, "{}    Notation: {}", i, n)?;
@@ -926,7 +941,7 @@ impl PacketDumper {
                     hexdump_unknown(output, n.value())?;
                 }
             }
-            PreferredHashAlgorithms(ref h) => write!(
+            PreferredHashAlgorithms(h) => write!(
                 output,
                 "{}    Hash preferences: {}",
                 i,
@@ -935,7 +950,7 @@ impl PacketDumper {
                     .collect::<Vec<String>>()
                     .join(", ")
             )?,
-            PreferredCompressionAlgorithms(ref c) => write!(
+            PreferredCompressionAlgorithms(c) => write!(
                 output,
                 "{}    Compression preferences: {}",
                 i,
@@ -944,45 +959,43 @@ impl PacketDumper {
                     .collect::<Vec<String>>()
                     .join(", ")
             )?,
-            KeyServerPreferences(ref p) => {
-                write!(output, "{}    Keyserver preferences: {:?}", i, p)?
-            }
-            PreferredKeyServer(ref k) => write!(
+            KeyServerPreferences(p) => write!(output, "{}    Keyserver preferences: {:?}", i, p)?,
+            PreferredKeyServer(k) => write!(
                 output,
                 "{}    Preferred keyserver: {}",
                 i,
                 String::from_utf8_lossy(k)
             )?,
             PrimaryUserID(p) => write!(output, "{}    Primary User ID: {}", i, p)?,
-            PolicyURI(ref p) => write!(
+            PolicyURI(p) => write!(
                 output,
                 "{}    Policy URI: {}",
                 i,
                 String::from_utf8_lossy(p)
             )?,
-            KeyFlags(ref k) => write!(output, "{}    Key flags: {:?}", i, k)?,
-            SignersUserID(ref u) => write!(
+            KeyFlags(k) => write!(output, "{}    Key flags: {:?}", i, k)?,
+            SignersUserID(u) => write!(
                 output,
                 "{}    Signer's User ID: {}",
                 i,
                 String::from_utf8_lossy(u)
             )?,
-            ReasonForRevocation { code, ref reason } => {
+            ReasonForRevocation { code, reason } => {
                 let reason = String::from_utf8_lossy(reason);
                 write!(
                     output,
                     "{}    Reason for revocation: {}{}{}",
                     i,
                     code,
-                    if reason.len() > 0 { ", " } else { "" },
+                    if !reason.is_empty() { ", " } else { "" },
                     reason
                 )?
             }
-            Features(ref f) => write!(output, "{}    Features: {:?}", i, f)?,
+            Features(f) => write!(output, "{}    Features: {:?}", i, f)?,
             SignatureTarget {
                 pk_algo,
                 hash_algo,
-                ref digest,
+                digest,
             } => write!(
                 output,
                 "{}    Signature target: {}, {}, {}",
@@ -996,8 +1009,8 @@ impl PacketDumper {
             {
                 write!(output, "{}    Embedded signature: ", i)?
             }
-            IssuerFingerprint(ref fp) => write!(output, "{}    Issuer Fingerprint: {}", i, fp)?,
-            PreferredAEADAlgorithms(ref c) => write!(
+            IssuerFingerprint(fp) => write!(output, "{}    Issuer Fingerprint: {}", i, fp)?,
+            PreferredAEADAlgorithms(c) => write!(
                 output,
                 "{}    AEAD preferences: {}",
                 i,
@@ -1006,7 +1019,7 @@ impl PacketDumper {
                     .collect::<Vec<String>>()
                     .join(", ")
             )?,
-            IntendedRecipient(ref fp) => write!(output, "{}    Intended Recipient: {}", i, fp)?,
+            IntendedRecipient(fp) => write!(output, "{}    Intended Recipient: {}", i, fp)?,
             AttestedCertifications(digests) => {
                 write!(output, "{}    Attested Certifications:", i)?;
                 if digests.is_empty() {
@@ -1026,7 +1039,7 @@ impl PacketDumper {
         match s.value() {
             Unknown { .. } => (),
             NotationData { .. } => (),
-            EmbeddedSignature(ref sig) => {
+            EmbeddedSignature(sig) => {
                 if s.critical() {
                     write!(output, " (critical)")?;
                 }
@@ -1054,14 +1067,14 @@ impl PacketDumper {
                 writeln!(output, "Simple")?;
                 writeln!(output, "{}    Hash: {}", i, hash)?;
             }
-            Salted { hash, ref salt } => {
+            Salted { hash, salt } => {
                 writeln!(output, "Salted")?;
                 writeln!(output, "{}    Hash: {}", i, hash)?;
                 writeln!(output, "{}    Salt: {}", i, hex::encode(salt))?;
             }
             Iterated {
                 hash,
-                ref salt,
+                salt,
                 hash_bytes,
             } => {
                 writeln!(output, "Iterated")?;
@@ -1129,6 +1142,6 @@ impl PacketDumper {
             ),
         ) as usize;
 
-        format!("{}  ", &i.chars().take(amount).collect::<String>())
+        format!("{}  ", i.chars().take(amount).collect::<String>())
     }
 }

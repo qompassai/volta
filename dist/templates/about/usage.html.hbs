@@ -1,0 +1,25 @@
+{{!-- First-party page written for Volta (Qompass AI, 2026). --}}
+{{#> layout }}
+  <h2>{{ text "Usage" }}</h2>
+
+  <h3>Searching</h3>
+  <p>
+    Use the search box on the <a href="/">front page</a>, or point GnuPG
+    at this server:
+  </p>
+  <pre>gpg --keyserver hkps://volta.qompass.ai --search-keys you@example.org</pre>
+
+  <h3>Publishing</h3>
+  <pre>gpg --keyserver hkps://volta.qompass.ai --send-keys &lt;key-id&gt;</pre>
+  <p>
+    Then verify your addresses from the upload page so the key can be
+    found by address and through the Web Key Directory.
+  </p>
+
+  <h3>Refreshing</h3>
+  <pre>gpg --keyserver hkps://volta.qompass.ai --refresh-keys</pre>
+  <p>
+    Refresh regularly: revocations and updated expiration dates are only
+    visible once your client fetches the current copy of a key.
+  </p>
+{{/layout}}

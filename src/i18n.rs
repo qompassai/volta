@@ -1,8 +1,24 @@
+// #################################################################
+// /qompassai/volta/src/i18n.rs
+// Qompass AI I18n
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Qompass AI
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 use handlebars::{
     Context, Handlebars, Helper, HelperDef, HelperResult, Output, RenderContext, RenderError,
 };
-
-use std::io;
 
 pub struct I18NHelper {
     catalogs: Vec<(&'static str, gettext::Catalog)>,
@@ -14,11 +30,11 @@ impl I18NHelper {
     }
 
     pub fn get_catalog(&self, lang: &str) -> &gettext::Catalog {
-        let (_, ref catalog) = self
+        let (_, catalog) = self
             .catalogs
             .iter()
             .find(|(candidate, _)| *candidate == lang)
-            .unwrap_or_else(|| self.catalogs.get(0).unwrap());
+            .unwrap_or_else(|| self.catalogs.first().unwrap());
         catalog
     }
 
@@ -32,18 +48,6 @@ impl I18NHelper {
         let catalog = self.get_catalog(lang);
         catalog.gettext(text_id)
         // format!("Unknown localization {}", text_id)
-    }
-}
-
-#[derive(Default)]
-struct StringOutput {
-    pub s: String,
-}
-
-impl Output for StringOutput {
-    fn write(&mut self, seg: &str) -> Result<(), io::Error> {
-        self.s.push_str(seg);
-        Ok(())
     }
 }
 
@@ -99,5 +103,55 @@ impl HelperDef for I18NHelper {
             out.write(response).map_err(render_error_with)?;
         }
         Ok(())
+    }
+}
+
+/// The per-request localization context, selected from the
+/// `Accept-Language` header against the catalogs managed by Rocket
+/// (see `web::get_i18n`). This replaces the `rocket_i18n` git
+/// dependency (GPL-3.0, pinned to a pre-release Rocket API whose
+/// `Outcome::Failure` variant no longer exists) with an in-tree
+/// implementation of the same selection contract.
+/// The managed catalog set: (language tag, catalog) pairs.
+pub type Translations = Vec<(&'static str, gettext::Catalog)>;
+
+pub struct I18n {
+    pub catalog: gettext::Catalog,
+    pub lang: &'static str,
+}
+
+#[rocket::async_trait]
+impl<'r> rocket::request::FromRequest<'r> for I18n {
+    type Error = ();
+
+    async fn from_request(
+        req: &'r rocket::Request<'_>,
+    ) -> rocket::request::Outcome<Self, Self::Error> {
+        use rocket::http::Status;
+        use rocket::request::Outcome;
+
+        let Some(langs) = req
+            .rocket()
+            .state::<Vec<(&'static str, gettext::Catalog)>>()
+        else {
+            return Outcome::Error((Status::InternalServerError, ()));
+        };
+
+        let lang = req
+            .headers()
+            .get_one("Accept-Language")
+            .unwrap_or("en")
+            .split(',')
+            .filter_map(|candidate| candidate.split(['-', ';']).next())
+            .find(|candidate| langs.iter().any(|(supported, _)| supported == candidate))
+            .unwrap_or("en");
+
+        match langs.iter().find(|(supported, _)| *supported == lang) {
+            Some((supported, catalog)) => Outcome::Success(I18n {
+                catalog: catalog.clone(),
+                lang: supported,
+            }),
+            None => Outcome::Error((Status::InternalServerError, ())),
+        }
     }
 }

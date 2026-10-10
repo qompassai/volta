@@ -1,11 +1,29 @@
+// #################################################################
+// /qompassai/volta/src/template_helpers.rs
+// Qompass AI Template Helpers
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Qompass AI
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 use handlebars::Handlebars;
 
+use crate::Result;
 use crate::i18n::I18NHelper;
 use crate::web::get_i18n;
-use crate::Result;
 
 #[derive(Debug)]
 pub struct TemplateOverrides(String, HashSet<String>);
@@ -19,7 +37,7 @@ impl TemplateOverrides {
     pub fn get_template_override(&self, lang: &str, tmpl: &str) -> Option<String> {
         let template_name = format!("{}/{}/{}", self.0, lang, tmpl);
         if self.1.contains(&template_name) {
-            println!("{}", &template_name);
+            println!("{}", template_name);
             Some(template_name)
         } else {
             None
@@ -44,7 +62,7 @@ fn load_localized_template_names(
                 .map(move |path| {
                     // TODO this is a hack
                     let template_name =
-                        remove_extension(remove_extension(path.strip_prefix(&template_path)?));
+                        remove_extension(remove_extension(path.strip_prefix(template_path)?));
                     Ok(template_name.to_string_lossy().into_owned())
                 })
         })

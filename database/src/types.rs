@@ -1,3 +1,22 @@
+// #################################################################
+// /qompassai/volta/database/src/types.rs
+// Qompass AI Types
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Qompass AI
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+use anyhow::Result;
 use std::convert::TryFrom;
 use std::fmt;
 use std::result;
@@ -6,7 +25,6 @@ use std::str::FromStr;
 use anyhow::Error;
 use openpgp::packet::UserID;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use Result;
 
 /// Holds a normalized email address.
 ///
@@ -30,7 +48,7 @@ impl TryFrom<&UserID> for Email {
     type Error = Error;
 
     fn try_from(uid: &UserID) -> Result<Self> {
-        if let Some(address) = uid.email()? {
+        if let Some(address) = uid.email2()? {
             let mut iter = address.split('@');
             let localpart = iter.next().expect("Invalid email address");
             let domain = iter.next().expect("Invalid email address");

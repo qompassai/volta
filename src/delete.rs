@@ -1,3 +1,21 @@
+// #################################################################
+// /qompassai/volta/src/delete.rs
+// Qompass AI Delete
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Qompass AI
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //! Deletes (address, key)-binding(s), and/or a key(s).
 
 use std::convert::TryInto;
@@ -76,7 +94,7 @@ fn delete(db: &KeyDatabase, query: &Query, all_bindings: bool, mut all: bool) ->
     // First, delete the bindings.
     if all_bindings || all {
         results.push(("all bindings".into(), db.set_email_unpublished_all(&fp)));
-    } else if let Query::ByEmail(ref email) = query {
+    } else if let Query::ByEmail(email) = query {
         results.push((email.to_string(), db.set_email_unpublished(&fp, email)));
     } else {
         unreachable!()
@@ -117,10 +135,10 @@ fn delete(db: &KeyDatabase, query: &Query, all_bindings: bool, mut all: bool) ->
                 "Deleted".into()
             }
         );
-        if err.is_ok() {
-            if let Err(e) = result {
-                err = Err(e);
-            }
+        if err.is_ok()
+            && let Err(e) = result
+        {
+            err = Err(e);
         }
     }
 

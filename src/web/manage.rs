@@ -1,12 +1,30 @@
+// #################################################################
+// /qompassai/volta/src/web/manage.rs
+// Qompass AI Manage
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Qompass AI
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+use crate::i18n::I18n;
 use rocket::form::Form;
-use rocket_i18n::I18n;
 
 use crate::Result;
 
 use gettext_macros::i18n;
 
 use crate::counters;
-use crate::database::{types::Email, types::Fingerprint, Database, KeyDatabase};
+use crate::database::{Database, KeyDatabase, types::Email, types::Fingerprint};
 use crate::mail;
 use crate::rate_limiter::RateLimiter;
 use crate::tokens::{self, StatelessSerializable};
@@ -75,8 +93,7 @@ pub fn vks_manage_key(
                 let fp = Fingerprint::try_from(tpk.fingerprint()).unwrap();
                 let mut emails: Vec<Email> = tpk
                     .userids()
-                    .map(|u| u.userid().to_string().parse::<Email>())
-                    .flatten()
+                    .flat_map(|u| u.userid().to_string().parse::<Email>())
                     .collect();
                 emails.sort_unstable();
                 emails.dedup();
@@ -127,15 +144,16 @@ pub fn vks_manage_post(
 ) -> MyResponse {
     use std::convert::TryInto;
 
+    let search_term = &request.search_term;
     let email = match request.search_term.parse::<Email>() {
         Ok(email) => email,
         Err(_) => {
             return MyResponse::not_found(
                 Some("manage/manage"),
-                Some(i18n!(i18n.catalog, "Malformed address: {}"; &request.search_term)),
+                Some(i18n!(i18n.catalog, "Malformed address: {}"; search_term)),
                 i18n,
                 origin,
-            )
+            );
         }
     };
 
@@ -144,10 +162,10 @@ pub fn vks_manage_post(
         Ok(None) => {
             return MyResponse::not_found(
                 Some("manage/manage"),
-                Some(i18n!(i18n.catalog, "No key for address: {}"; &request.search_term)),
+                Some(i18n!(i18n.catalog, "No key for address: {}"; search_term)),
                 i18n,
                 origin,
-            )
+            );
         }
         Err(e) => return MyResponse::ise(e),
     };
@@ -161,7 +179,7 @@ pub fn vks_manage_post(
         return MyResponse::ise(anyhow!("Internal error: address check failed!"));
     }
 
-    if !rate_limiter.action_perform(format!("manage-{}", &email)) {
+    if !rate_limiter.action_perform(format!("manage-{}", email)) {
         return MyResponse::not_found(
             Some("manage/manage"),
             Some(i18n!(

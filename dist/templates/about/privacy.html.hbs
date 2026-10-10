@@ -1,0 +1,35 @@
+{{!-- First-party page written for Volta (Qompass AI, 2026). --}}
+{{#> layout }}
+  <h2>{{ text "Privacy" }}</h2>
+
+  <h3>Public Key Data</h3>
+  <p>
+    A keyserver exists to publish public keys. Everything Volta serves —
+    the key material itself, user IDs, and the addresses an owner has
+    verified — is public by design and can be retrieved by anyone. Do not
+    upload a key you do not want to be public.
+  </p>
+
+  <h3>What is stored</h3>
+  <p>
+    Uploaded keys are stored as submitted. An address becomes searchable
+    only after its owner confirms it through the verification email;
+    unverified addresses are not published. Verification and management
+    links are sent by email and expire.
+  </p>
+
+  <h3>Removal</h3>
+  <p>
+    From the <a href="/manage">manage page</a>, a key owner can unpublish
+    any verified address. Once every address of a key is unpublished, the
+    key is no longer distributed. Note that copies other people have
+    already downloaded cannot be recalled — that is a property of public
+    key distribution, not of this service.
+  </p>
+
+  <h3>Server logs</h3>
+  <p>
+    Requests are logged for operations and abuse prevention and are not
+    sold or shared for advertising.
+  </p>
+{{/layout}}

@@ -1,8 +1,26 @@
+// #################################################################
+// /qompassai/volta/src/web/vks_api.rs
+// Qompass AI Vks Api
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Qompass AI
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+use crate::i18n::{I18n, Translations};
 use rocket::http::{ContentType, Status};
 use rocket::request::Request;
 use rocket::response::{self, Responder, Response};
 use rocket::serde::json::Json;
-use rocket_i18n::{I18n, Translations};
 use serde_json::json;
 use std::io::Cursor;
 
@@ -114,7 +132,7 @@ pub fn upload_fallback(origin: RequestOrigin) -> JsonErrorResponse {
 fn get_locale(langs: &rocket::State<Translations>, locales: Vec<String>) -> I18n {
     locales
         .iter()
-        .flat_map(|lang| lang.split(|c| c == '-' || c == ';' || c == '_').next())
+        .flat_map(|lang| lang.split(['-', ';', '_']).next())
         .flat_map(|lang| langs.iter().find(|(trans, _)| trans == &lang))
         .next()
         .or_else(|| langs.iter().find(|(trans, _)| trans == &"en"))

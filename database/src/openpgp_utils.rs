@@ -1,12 +1,30 @@
+// #################################################################
+// /qompassai/volta/database/src/openpgp_utils.rs
+// Qompass AI Openpgp Utils
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Qompass AI
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 use openpgp::Result;
 use std::convert::TryFrom;
 
 use openpgp::{
-    cert::prelude::*, policy::StandardPolicy, serialize::SerializeInto as _,
-    types::RevocationStatus, Cert,
+    Cert, cert::prelude::*, policy::StandardPolicy, serialize::SerializeInto as _,
+    types::RevocationStatus,
 };
 
-use Email;
+use crate::types::Email;
 
 pub const POLICY: StandardPolicy = StandardPolicy::new();
 
@@ -30,26 +48,26 @@ pub fn tpk_clean(tpk: &Cert) -> Result<Cert> {
     // The primary key and related signatures.
     let pk_bundle = tpk.primary_key().bundle();
     acc.push(pk_bundle.key().clone().into());
-    for s in pk_bundle.self_signatures() {
+    for s in pk_bundle.self_signatures2() {
         acc.push(s.clone().into())
     }
-    for s in pk_bundle.self_revocations() {
+    for s in pk_bundle.self_revocations2() {
         acc.push(s.clone().into())
     }
-    for s in pk_bundle.other_revocations() {
+    for s in pk_bundle.other_revocations2() {
         acc.push(s.clone().into())
     }
 
     // The subkeys and related signatures.
     for skb in tpk.keys().subkeys() {
         acc.push(skb.key().clone().into());
-        for s in skb.self_signatures() {
+        for s in skb.self_signatures2() {
             acc.push(s.clone().into())
         }
-        for s in skb.self_revocations() {
+        for s in skb.self_revocations2() {
             acc.push(s.clone().into())
         }
-        for s in skb.other_revocations() {
+        for s in skb.other_revocations2() {
             acc.push(s.clone().into())
         }
     }
@@ -57,13 +75,13 @@ pub fn tpk_clean(tpk: &Cert) -> Result<Cert> {
     // The UserIDs.
     for uidb in tpk.userids() {
         acc.push(uidb.userid().clone().into());
-        for s in uidb.self_signatures() {
+        for s in uidb.self_signatures2() {
             acc.push(s.clone().into())
         }
-        for s in uidb.self_revocations() {
+        for s in uidb.self_revocations2() {
             acc.push(s.clone().into())
         }
-        for s in uidb.other_revocations() {
+        for s in uidb.other_revocations2() {
             acc.push(s.clone().into())
         }
 

@@ -1,16 +1,34 @@
+// #################################################################
+// /qompassai/volta/src/web/vks_web.rs
+// Qompass AI Vks Web
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Qompass AI
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 use crate::Result;
 
+use multipart::server::Multipart;
 use multipart::server::save::Entries;
 use multipart::server::save::SaveResult::*;
-use multipart::server::Multipart;
 
+use crate::i18n::I18n;
 use gettext_macros::i18n;
+use rocket::Data;
 use rocket::data::ByteUnit;
 use rocket::form::Form;
 use rocket::form::ValueField;
 use rocket::http::ContentType;
-use rocket::Data;
-use rocket_i18n::I18n;
 use url::percent_encoding::percent_decode;
 
 use crate::database::{Database, KeyDatabase, Query, StatefulTokens};
@@ -33,11 +51,6 @@ mod forms {
     pub struct VerifyRequest {
         pub token: String,
         pub address: String,
-    }
-
-    #[derive(Deserialize)]
-    pub struct UploadRequest {
-        pub keytext: String,
     }
 }
 
@@ -355,7 +368,7 @@ pub async fn process_post_form(
     // application/x-www-form-urlencoded
     let buf = data.open(UPLOAD_LIMIT).into_bytes().await?;
 
-    for ValueField { name, value } in Form::values(&*String::from_utf8_lossy(&buf)) {
+    for ValueField { name, value } in Form::values(&String::from_utf8_lossy(&buf)) {
         let decoded_value = percent_decode(value.as_bytes())
             .decode_utf8()
             .map_err(|_| anyhow!("`Content-Type: application/x-www-form-urlencoded` not valid"))?;
@@ -498,7 +511,7 @@ pub fn verify_confirm(
     i18n: I18n,
     token: String,
 ) -> MyResponse {
-    let rate_limit_id = format!("verify-token-{}", &token);
+    let rate_limit_id = format!("verify-token-{}", token);
     match vks::verify_confirm(db, &i18n, token_service, token) {
         PublishResponse::Ok { fingerprint, email } => {
             rate_limiter.action_perform(rate_limit_id);

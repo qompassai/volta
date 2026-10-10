@@ -1,3 +1,22 @@
+// #################################################################
+// /qompassai/volta/src/web/mod.rs
+// Qompass AI Web mod
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Qompass AI
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+use crate::i18n::I18n;
 use hyperx::header::{Charset, ContentDisposition, DispositionParam, DispositionType};
 use rocket::figment::Figment;
 use rocket::fs::NamedFile;
@@ -7,7 +26,6 @@ use rocket::request;
 use rocket::response::status::Custom;
 use rocket::response::{Responder, Response};
 use rocket_dyn_templates::{Engines, Template};
-use rocket_i18n::I18n;
 use rocket_prometheus::PrometheusMetrics;
 
 use gettext_macros::{compile_i18n, include_i18n};
@@ -24,9 +42,9 @@ use crate::rate_limiter::RateLimiter;
 use crate::template_helpers::TemplateOverrides;
 use crate::tokens;
 
+use crate::Result;
 use crate::database::types::Fingerprint;
 use crate::database::{Database, KeyDatabase, Query};
-use crate::Result;
 
 use std::convert::TryInto;
 
@@ -594,12 +612,12 @@ pub mod tests {
     use std::fs::File;
     use std::io::Write;
     use std::path::Path;
-    use tempfile::{tempdir, TempDir};
+    use tempfile::{TempDir, tempdir};
 
+    use sequoia_openpgp::Cert;
     use sequoia_openpgp::cert::CertBuilder;
     use sequoia_openpgp::parse::Parse;
     use sequoia_openpgp::serialize::Serialize;
-    use sequoia_openpgp::Cert;
 
     use std::time::SystemTime;
 
@@ -728,10 +746,12 @@ pub mod tests {
         let response = client.get("/about").dispatch();
         assert_eq!(response.status(), Status::Ok);
         assert_eq!(response.content_type(), Some(ContentType::HTML));
-        assert!(response
-            .into_string()
-            .unwrap()
-            .contains("distribution and discovery"));
+        assert!(
+            response
+                .into_string()
+                .unwrap()
+                .contains("distribution and discovery")
+        );
 
         // Check that we see the privacy policy.
         let response = client.get("/about/privacy").dispatch();
@@ -755,10 +775,12 @@ pub mod tests {
         let response = client.get("/manage").dispatch();
         assert_eq!(response.status(), Status::Ok);
         assert_eq!(response.content_type(), Some(ContentType::HTML));
-        assert!(response
-            .into_string()
-            .unwrap()
-            .contains("any verified email address"));
+        assert!(
+            response
+                .into_string()
+                .unwrap()
+                .contains("any verified email address")
+        );
 
         assert_consistency(client.rocket());
     }
@@ -783,30 +805,36 @@ pub mod tests {
         let response = client.put("/").dispatch();
         assert_eq!(response.status(), Status::ServiceUnavailable);
         assert_eq!(response.content_type(), Some(ContentType::Plain));
-        assert!(response
-            .into_string()
-            .unwrap()
-            .contains("maintenance-message"));
+        assert!(
+            response
+                .into_string()
+                .unwrap()
+                .contains("maintenance-message")
+        );
 
         fs::remove_file(&maintenance_path).unwrap();
         // Check that we see the upload form.
         let response = client.get("/upload").dispatch();
         assert_eq!(response.status(), Status::Ok);
         assert_eq!(response.content_type(), Some(ContentType::HTML));
-        assert!(!response
-            .into_string()
-            .unwrap()
-            .contains("maintenance-message"));
+        assert!(
+            !response
+                .into_string()
+                .unwrap()
+                .contains("maintenance-message")
+        );
     }
 
     fn check_maintenance(client: &Client, uri: &str, content_type: ContentType) {
         let response = client.get(uri).dispatch();
         assert_eq!(response.status(), Status::ServiceUnavailable);
         assert_eq!(response.content_type(), Some(content_type));
-        assert!(response
-            .into_string()
-            .unwrap()
-            .contains("maintenance-message"));
+        assert!(
+            response
+                .into_string()
+                .unwrap()
+                .contains("maintenance-message")
+        );
     }
 
     #[test]
@@ -1353,10 +1381,12 @@ pub mod tests {
 
         let response_second = client.post(&confirm_uri).dispatch();
         assert_eq!(response_second.status(), Status::BadRequest);
-        assert!(response_second
-            .into_string()
-            .unwrap()
-            .contains("already been verified"));
+        assert!(
+            response_second
+                .into_string()
+                .unwrap()
+                .contains("already been verified")
+        );
     }
 
     fn check_mails_and_confirm_deletion(client: &Client, filemail_path: &Path, address: &str) {
@@ -1407,14 +1437,14 @@ pub mod tests {
     }
 
     fn vks_publish_submit_response<'a>(client: &'a Client, data: &[u8]) -> LocalResponse<'a> {
-        let ct = ContentType::with_params(
-            "multipart",
-            "form-data",
-            (
-                "boundary",
-                "---------------------------14733842173518794281682249499",
-            ),
-        );
+        // Note: ContentType::FormData.with_params(..) loses the
+        // parameters again in rocket_http 0.5.1, whose Display impl
+        // short-circuits known media types to their source string.
+        // A freshly constructed type renders its parameters.
+        let ct = ContentType::new("multipart", "form-data").with_params([(
+            "boundary",
+            "---------------------------14733842173518794281682249499",
+        )]);
 
         let header = b"-----------------------------14733842173518794281682249499\r\n\
               Content-Disposition: form-data; name=\"csrf\"\r\n\

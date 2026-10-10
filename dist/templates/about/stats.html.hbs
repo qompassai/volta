@@ -1,0 +1,16 @@
+{{!-- First-party page written for Volta (Qompass AI, 2026). --}}
+{{#> layout }}
+  <h2>{{ text "Statistics" }}</h2>
+
+  <p>
+    Volta exposes Prometheus metrics at <code>/metrics</code>, including
+    request counts by route and key-upload counters, for operators who
+    want to watch the health of the service.
+  </p>
+
+  <p>
+    This public page intentionally keeps no per-address or per-key usage
+    statistics: a keyserver's lookup traffic says a lot about who is
+    talking to whom, and Volta does not publish it.
+  </p>
+{{/layout}}

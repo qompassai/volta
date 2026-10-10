@@ -1,3 +1,21 @@
+// #################################################################
+// /qompassai/volta/src/web/vks.rs
+// Qompass AI Vks
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Qompass AI
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 use crate::Result;
 
 use crate::counters;
@@ -10,32 +28,19 @@ use crate::rate_limiter::RateLimiter;
 use crate::tokens::{self, StatelessSerializable};
 use crate::web::RequestOrigin;
 
+use crate::i18n::I18n;
 use gettext_macros::i18n;
-use rocket_i18n::I18n;
 
+use sequoia_openpgp::Cert;
 use sequoia_openpgp::armor::ReaderMode;
 use sequoia_openpgp::cert::CertParser;
 use sequoia_openpgp::parse::{Dearmor, PacketParserBuilder, Parse};
-use sequoia_openpgp::Cert;
 
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::io::Read;
 
 use self::response::*;
-
-pub mod request {
-    #[derive(Deserialize)]
-    pub struct UploadRequest {
-        pub keytext: String,
-    }
-
-    #[derive(Deserialize)]
-    pub struct VerifyRequest {
-        pub token: String,
-        pub addresses: Vec<String>,
-    }
-}
 
 pub mod response {
     use crate::database::types::Email;
@@ -178,7 +183,7 @@ fn process_key_single(
         Ok(ImportResult::Updated(tpk_status)) => (tpk_status, false),
         Ok(ImportResult::Unchanged(tpk_status)) => (tpk_status, false),
         Err(_) => {
-            return UploadResponse::err(i18n!(i18n.catalog, "Error processing uploaded key."))
+            return UploadResponse::err(i18n!(i18n.catalog, "Error processing uploaded key."));
         }
     };
 
@@ -213,7 +218,7 @@ pub fn request_verify(
 ) -> response::UploadResponse {
     let (verify_state, tpk_status) = match check_tpk_state(db, token_stateless, i18n, &token) {
         Ok(ok) => ok,
-        Err(e) => return UploadResponse::err(&e.to_string()),
+        Err(e) => return UploadResponse::err(e.to_string()),
     };
 
     if tpk_status.is_revoked {
@@ -222,8 +227,7 @@ pub fn request_verify(
 
     let emails_requested: Vec<_> = addresses
         .into_iter()
-        .map(|address| address.parse::<Email>())
-        .flatten()
+        .flat_map(|address| address.parse::<Email>())
         .filter(|email| verify_state.addresses.contains(email))
         .filter(|email| {
             tpk_status.email_status.iter().any(|(uid_email, status)| {
@@ -233,7 +237,7 @@ pub fn request_verify(
         .collect();
 
     for email in emails_requested {
-        let rate_limit_ok = rate_limiter.action_perform(format!("verify-{}", &email));
+        let rate_limit_ok = rate_limiter.action_perform(format!("verify-{}", email));
         if rate_limit_ok
             && send_verify_email(
                 origin,
@@ -245,7 +249,7 @@ pub fn request_verify(
             )
             .is_err()
         {
-            return UploadResponse::err(&format!("error sending email to {}", &email));
+            return UploadResponse::err(format!("error sending email to {}", email));
         }
     }
 
@@ -347,7 +351,7 @@ fn show_upload_verify(
         .iter()
         .map(|(email, status)| {
             let is_pending = (*status == EmailAddressStatus::NotPublished)
-                && !rate_limiter.action_check(format!("verify-{}", &email));
+                && !rate_limiter.action_check(format!("verify-{}", email));
             if is_pending {
                 (email.to_string(), EmailStatus::Pending)
             } else {
@@ -364,7 +368,7 @@ fn show_upload_verify(
         .collect();
     let primary_uid = tpk_status
         .email_status
-        .get(0)
+        .first()
         .map(|(email, _)| email)
         .cloned();
 

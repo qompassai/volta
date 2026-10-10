@@ -1,21 +1,39 @@
+// #################################################################
+// /qompassai/volta/src/mail.rs
+// Qompass AI Verification and Management Mail
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Qompass AI
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 use std::path::{Path, PathBuf};
 
 use crate::counters;
 use handlebars::Handlebars;
 use lettre::builder::{EmailBuilder, Mailbox, MimeMultipartType, PartBuilder};
-use lettre::{file::FileTransport, SendmailTransport, Transport as LettreTransport};
+use lettre::{SendmailTransport, Transport as LettreTransport, file::FileTransport};
 use serde::Serialize;
 use uuid::Uuid;
 
+use crate::i18n::I18n;
 use gettext_macros::i18n;
-use rocket_i18n::I18n;
 
 use rfc2047::rfc2047_encode;
 
 use crate::template_helpers;
 
-use crate::database::types::Email;
 use crate::Result;
+use crate::database::types::Email;
 
 mod context {
     #[derive(Serialize, Clone)]
@@ -108,19 +126,15 @@ impl Service {
 
         counters::inc_mail_sent("verify", userid);
 
-        self.send(
-            &[userid],
-            &i18n!(
-                i18n.catalog,
-                context = "Subject for verification email, {0} = userid, {1} = keyserver domain",
-                "Verify {0} for your key on {1}";
-                userid,
-                &self.domain,
-            ),
-            "verify",
-            i18n.lang,
-            ctx,
-        )
+        let domain = &self.domain;
+        let subject = i18n!(
+            i18n.catalog,
+            context = "Subject for verification email, {0} = userid, {1} = keyserver domain",
+            "Verify {0} for your key on {1}";
+            userid,
+            domain,
+        );
+        self.send(&[userid], &subject, "verify", i18n.lang, ctx)
     }
 
     pub fn send_manage_token(
@@ -141,18 +155,14 @@ impl Service {
 
         counters::inc_mail_sent("manage", recipient);
 
-        self.send(
-            &[recipient],
-            &i18n!(
-                i18n.catalog,
-                context = "Subject for manage email, {} = keyserver domain",
-                "Manage your key on {}";
-                &self.domain
-            ),
-            "manage",
-            i18n.lang,
-            ctx,
-        )
+        let domain = &self.domain;
+        let subject = i18n!(
+            i18n.catalog,
+            context = "Subject for manage email, {} = keyserver domain",
+            "Manage your key on {}";
+            domain
+        );
+        self.send(&[recipient], &subject, "manage", i18n.lang, ctx)
     }
 
     pub fn send_welcome(
@@ -215,7 +225,7 @@ impl Service {
             for recipient in to.iter() {
                 println!("To: {}", recipient);
             }
-            println!("{}", &txt);
+            println!("{}", txt);
         }
 
         // build this ourselves, as a temporary workaround for https://github.com/lettre/lettre/issues/400
@@ -296,7 +306,7 @@ mod test {
 
     use super::*;
     use std::str::FromStr;
-    use tempfile::{tempdir, TempDir};
+    use tempfile::{TempDir, tempdir};
 
     const BASEDIR: &str = "http://localhost/";
     const FROM: &str = "test@localhost";
@@ -310,7 +320,7 @@ mod test {
             .find(|(l, _)| *l == lang)
             .unwrap()
             .1;
-        rocket_i18n::I18n { catalog, lang }
+        I18n { catalog, lang }
     }
 
     fn configure_mail() -> (Service, TempDir) {
@@ -340,9 +350,8 @@ mod test {
             .lines()
             .filter(|line| line.contains(": "))
             .map(|line| {
-                let mut it = line.splitn(2, ": ");
-                let h = it.next().unwrap();
-                let v = it.next().unwrap();
+                let (h, v) = line.split_once(": ").unwrap();
+
                 (h, v)
             })
             .collect();
@@ -413,7 +422,7 @@ mod test {
         assert!(mail_content.contains("test/about"));
         assert!(mail_content.contains("あなたのメールアド"));
         assert!(mail_content.contains(
-            "Subject:   =?utf-8?q?localhost=E3=81=AE=E3=81=82=E3=81=AA=E3=81=9F=E3=81=AE?="
+            "Subject: =?utf-8?q?localhost=E3=81=AE=E3=81=82=E3=81=AA=E3=81=9F=E3=81=AE?="
         ));
     }
 
