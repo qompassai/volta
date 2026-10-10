@@ -1,0 +1,57 @@
+# #################################################################
+# /qompassai/volta/rewrite/Cargo.toml
+# Qompass AI Volta Clean-Room Rewrite — Workspace
+# SPDX-License-Identifier: AGPL-3.0-only OR Apache-2.0
+# Copyright (c) 2026 Qompass AI
+#
+# Original work of Qompass AI (clean-room rewrite, 2026-10-10).
+# Dual-licensed under AGPL-3.0-only OR Apache-2.0 at the
+# recipient's choice (see LICENSE, LICENSE-AGPL, NOTICE).
+# #################################################################
+
+[workspace]
+members = [
+    "crates/volta-cli",
+    "crates/volta-core",
+    "crates/volta-crypto",
+    "crates/volta-proxy",
+    "crates/volta-server",
+]
+resolver = "2"
+
+[workspace.package]
+edition = "2024"
+license = "AGPL-3.0-only OR Apache-2.0"
+rust-version = "1.85"
+version = "2.0.0"
+
+[workspace.dependencies]
+aes-gcm = "0.10"
+axum = { version = "0.8", features = ["json"] }
+base64 = "0.22"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+clap = { version = "4", features = ["derive"] }
+ed25519-dalek = { version = "2", features = ["rand_core"] }
+hkdf = "0.12"
+hmac = "0.12"
+ml-dsa = "0.1"
+ml-kem = "0.2"
+pgp = "0.19"
+rand = "0.8"
+rand_core = "0.6"
+rusqlite = { version = "0.32", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+sha1 = "0.10"
+sha2 = "0.10"
+thiserror = "2"
+tokio = { version = "1", features = ["full"] }
+toml = "0.8"
+uuid = { version = "1", features = ["v7"] }
+webauthn-rs = { version = "=0.5.5", default-features = false, features = ["danger-allow-state-serialisation"] }
+x25519-dalek = { version = "2", features = ["getrandom", "static_secrets"] }
+x448 = "0.14.0-pre.12"
+zeroize = { version = "1", features = ["derive"] }
+
+[profile.release]
+lto = "thin"

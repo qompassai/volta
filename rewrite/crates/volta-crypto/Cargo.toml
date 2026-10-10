@@ -1,0 +1,23 @@
+[package]
+name = "volta-crypto"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Volta clean-room rewrite: algorithm allowlist, hybrid PQC KEM suites, ML-DSA-87 and Ed25519 signing"
+
+[dependencies]
+base64.workspace = true
+ed25519-dalek.workspace = true
+hkdf.workspace = true
+ml-dsa.workspace = true
+ml-kem.workspace = true
+rand.workspace = true
+rand_core.workspace = true
+serde.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+volta-core = { path = "../volta-core" }
+x25519-dalek.workspace = true
+x448.workspace = true
+zeroize.workspace = true

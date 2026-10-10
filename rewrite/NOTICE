@@ -1,0 +1,16 @@
+Volta — clean-room rewrite (2026-10-10)
+=======================================
+
+The code in this directory (rewrite/) is original work of Qompass AI,
+written from a behavior/interface specification derived from public
+protocol specifications (HKP, the keys.openpgp.org VKS API, the Web
+Key Directory draft, OpenPGP RFC 9580, RFC 9980, FIPS 203, FIPS 204)
+and from the predecessor's published documentation and black-box
+behavior. It is not copied from, and does not derive from, the Hagrid
+codebase. The predecessor tree outside this directory remains
+Hagrid-derived and AGPL-3.0-only, as its own NOTICE states; that
+history is preserved in git history and is not relabeled.
+
+Licensing of this rewrite: dual-licensed under AGPL-3.0-only OR
+Apache-2.0, at the recipient's choice. See LICENSE (Apache-2.0) and
+LICENSE-AGPL (AGPL-3.0) in this directory.

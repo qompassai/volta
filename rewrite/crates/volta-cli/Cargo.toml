@@ -1,0 +1,25 @@
+[package]
+name = "volta-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Volta clean-room rewrite: operator CLI (voltactl) and volta-delete"
+
+[dependencies]
+clap.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+volta-core = { path = "../volta-core" }
+volta-crypto = { path = "../volta-crypto" }
+volta-proxy = { path = "../volta-proxy" }
+volta-server = { path = "../volta-server" }
+
+[[bin]]
+name = "volta-delete"
+path = "src/bin/volta_delete.rs"
+
+[[bin]]
+name = "voltactl"
+path = "src/main.rs"
