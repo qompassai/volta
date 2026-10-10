@@ -1,31 +1,39 @@
+# crates/volta-server/Cargo.toml - volta-server manifest.
+#
+# Dual licensed under AGPL-3.0-only OR Apache-2.0.
+
 [package]
 name = "volta-server"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-description = "Volta clean-room rewrite: HTTP key server (HKP, VKS, WKD), ephemeral keys, MCP, A2A, WebAuthn operator auth"
+
+[[bin]]
+name = "volta-server"
+path = "src/main.rs"
 
 [dependencies]
 axum.workspace = true
 base64.workspace = true
-chrono.workspace = true
-ed25519-dalek.workspace = true
+hex.workspace = true
+hyper = "1"
+hyper-util = "0.1"
 rand.workspace = true
+rusqlite.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
+url.workspace = true
 uuid.workspace = true
 volta-core = { path = "../volta-core" }
 volta-crypto = { path = "../volta-crypto" }
 volta-proxy = { path = "../volta-proxy" }
 webauthn-rs.workspace = true
+zeroize.workspace = true
 
 [dev-dependencies]
+tower.workspace = true
 webauthn-authenticator-rs = { version = "=0.5.5", features = ["softpasskey"] }
-
-[[bin]]
-name = "volta"
-path = "src/main.rs"
