@@ -3,16 +3,26 @@
 <!-- SPDX-License-Identifier: AGPL-3.0-only OR Apache-2.0 -->
 <!-- Copyright (c) 2026 Qompass AI -->
 
-ORIGINATED, NOT REPLICATED: no project repo in the Qompass estate
-carries a repo-level OpenShell config (verified 2026-10-10 across
-light-show, phlow, volta, vongola, and the GitHub mirrors). The only
-established pattern is machine-level: the NVIDIA OpenShell gateway
-configuration in the operator's home (`~/.config/openshell/
-gateway.toml`, version 2, podman driver, mTLS) documented by
-`agents/openshell/CONFIGURATION.md` in the diver configuration.
+This directory follows the estate OpenShell pattern; it is not
+an originated design. The pattern's source of truth is
+machine-level: the OpenShell gateway configuration reference
+kept with the diver configuration at
+`agents/openshell/CONFIGURATION.md`, and the operator's active
+gateway config at `~/.config/openshell/gateway.toml` (schema
+version 2, podman driver pinned, mTLS on by default).
 
-This directory is the minimal idiomatic equivalent for volta:
-`gateway.toml.example` mirrors the machine gateway's shape with
-volta-specific naming, so a volta development sandbox can be run
-behind the same gateway conventions. It contains no secrets; real
-gateway state stays in the operator's home configuration.
+`gateway.toml.example` is that gateway shape carrying volta's
+values, so a volta development sandbox runs behind the same
+gateway conventions as the rest of the estate. It contains no
+secrets; real gateway state stays in the operator's home
+configuration, and TLS material is auto-generated under
+`~/.local/state/openshell/tls/`.
+
+History: this directory was originated independently during the
+2026-10-10 clean-room rewrite, before the estate pattern was
+located, and was reconciled to the pattern the same day. The
+originated sketch used invented `[gateway]` and `[sandbox]`
+sections with `address`/`driver`/`mtls` fields; the schema's
+real shape is `[openshell]` with `version = 2`,
+`[openshell.gateway]` (`bind_address`, `compute_driver`, mTLS
+by default), and `[openshell.drivers.podman]`.
