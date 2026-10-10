@@ -1,0 +1,8 @@
+# Validation (control): a clean session may use /tmp scratch. The
+# staging zones are denied only after a secret-class read narrows
+# the session; they are not blanket denies.
+host/claude-code/Write {
+  file_path: "/tmp/volta-scratch.txt"
+  content: "scratch"
+}
+expect allow

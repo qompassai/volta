@@ -1,0 +1,452 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (c) 2026 Qompass AI
+#
+# Pax volta profile for OpenAPPA (estate adaptation, 2026-10-10).
+#
+# Case: a dispatched Claude worker doing Rust work in this repository
+# (the clean-room volta rewrite: key server, proxy, MCP/A2A surfaces).
+# This profile is the second, deterministic gate under the harness's
+# own permissions, modeled on the OpenAPPA pilot's image profile
+# (~/openappa-pilot/profiles/image/appa.toml): the claude-code battery
+# is included unchanged, and the root rules below add volta's own
+# workflows, volta's secret classes, and volta's MCP tool tiers.
+#
+# Root rules run before the included battery's rules, and the first
+# matching rule wins. Inside the Bash group the hard denies come
+# before the allows on purpose: the deny selectors are substrings, so
+# a denied operation inside a compound command is still blocked,
+# while the allow selectors are command prefixes. Everywhere else
+# the rules are alphabetical.
+#
+# Labels: reading a file of one of volta's secret classes narrows the
+# session audience to `self` (APPA's audience for the requester's own
+# secrets; the battery's `credentials` tag records why). A narrowed
+# session cannot write to the staging zones declared below, and the
+# network commands are hard-denied in every session.
+#
+# The include is relative, as the engine requires: it resolves only
+# where the pinned pilot tree sits at ~/openappa-pilot, and the
+# configuration fails to load anywhere else rather than running
+# without the battery.
+
+include = ["../../../../openappa-pilot/src/marketplace/batteries/claude-code/appa.toml"]
+
+[policy]
+version = 2
+trust_chain = ["suspicious", "trusted"]
+
+# --- Bash: network egress and destructive operations, hard deny ---
+#
+# `blocked` is the reserved attention mark no authority can permit:
+# these calls have no remedy, in replay or live.
+
+[[policy.tool]]
+name = "host/claude-code/Bash(command:* gh *)"
+requires = { attention = ["blocked"] }
+delta = {}
+
+[[policy.tool]]
+name = "host/claude-code/Bash(command:* nc *)"
+requires = { attention = ["blocked"] }
+delta = {}
+
+[[policy.tool]]
+name = "host/claude-code/Bash(command:*/nc *)"
+requires = { attention = ["blocked"] }
+delta = {}
+
+[[policy.tool]]
+name = "host/claude-code/Bash(command:*curl *)"
+requires = { attention = ["blocked"] }
+delta = {}
+
+[[policy.tool]]
+name = "host/claude-code/Bash(command:*git -* push*)"
+requires = { attention = ["blocked"] }
+delta = {}
+
+[[policy.tool]]
+name = "host/claude-code/Bash(command:*git clean*)"
+requires = { attention = ["blocked"] }
+delta = {}
+
+[[policy.tool]]
+name = "host/claude-code/Bash(command:*git push*)"
+requires = { attention = ["blocked"] }
+delta = {}
+
+[[policy.tool]]
+name = "host/claude-code/Bash(command:*git reset*)"
+requires = { attention = ["blocked"] }
+delta = {}
+
+[[policy.tool]]
+name = "host/claude-code/Bash(command:*rm -fr*)"
+requires = { attention = ["blocked"] }
+delta = {}
+
+[[policy.tool]]
+name = "host/claude-code/Bash(command:*rm -rf*)"
+requires = { attention = ["blocked"] }
+delta = {}
+
+[[policy.tool]]
+name = "host/claude-code/Bash(command:*sudo *)"
+requires = { attention = ["blocked"] }
+delta = {}
+
+[[policy.tool]]
+name = "host/claude-code/Bash(command:*wget *)"
+requires = { attention = ["blocked"] }
+delta = {}
+
+[[policy.tool]]
+name = "host/claude-code/Bash(command:gh *)"
+requires = { attention = ["blocked"] }
+delta = {}
+
+[[policy.tool]]
+name = "host/claude-code/Bash(command:nc *)"
+requires = { attention = ["blocked"] }
+delta = {}
+
+# --- Bash: the repo's own workflows, allowed ---
+
+[[policy.tool]]
+name = "host/claude-code/Bash(command:cargo build)"
+delta = {}
+
+[[policy.tool]]
+name = "host/claude-code/Bash(command:cargo build *)"
+delta = {}
+
+[[policy.tool]]
+name = "host/claude-code/Bash(command:cargo clippy)"
+delta = {}
+
+[[policy.tool]]
+name = "host/claude-code/Bash(command:cargo clippy *)"
+delta = {}
+
+[[policy.tool]]
+name = "host/claude-code/Bash(command:cargo fmt)"
+delta = {}
+
+[[policy.tool]]
+name = "host/claude-code/Bash(command:cargo fmt *)"
+delta = {}
+
+[[policy.tool]]
+name = "host/claude-code/Bash(command:cargo test)"
+delta = {}
+
+[[policy.tool]]
+name = "host/claude-code/Bash(command:cargo test *)"
+delta = {}
+
+[[policy.tool]]
+name = "host/claude-code/Bash(command:mdbook build)"
+delta = {}
+
+[[policy.tool]]
+name = "host/claude-code/Bash(command:mdbook build *)"
+delta = {}
+
+[[policy.tool]]
+name = "host/claude-code/Bash(command:nix build)"
+delta = {}
+
+[[policy.tool]]
+name = "host/claude-code/Bash(command:nix build *)"
+delta = {}
+
+# --- MCP: volta's read-only tools, allowed ---
+
+[[policy.tool]]
+name = "mcp/volta/volta_ephemeral_status"
+delta = {}
+
+[[policy.tool]]
+name = "mcp/volta/volta_key_lookup_by_email"
+delta = {}
+
+[[policy.tool]]
+name = "mcp/volta/volta_key_lookup_by_fingerprint"
+delta = {}
+
+[[policy.tool]]
+name = "mcp/volta/volta_key_lookup_by_keyid"
+delta = {}
+
+[[policy.tool]]
+name = "mcp/volta/volta_proxy_chain_check"
+delta = {}
+
+[[policy.tool]]
+name = "mcp/volta/volta_relay_fetch_key"
+delta = {}
+
+[[policy.tool]]
+name = "mcp/volta/volta_wkd_lookup"
+delta = {}
+
+# --- MCP: volta's mutating tools, ask-tier ---
+#
+# State-changing operations wait for the person running the session.
+
+[[policy.tool]]
+name = "mcp/volta/volta_ephemeral_issue"
+requires = { attention = ["hitl"] }
+delta = {}
+
+[[policy.tool]]
+name = "mcp/volta/volta_ephemeral_revoke"
+requires = { attention = ["hitl"] }
+delta = {}
+
+[[policy.tool]]
+name = "mcp/volta/volta_ephemeral_rotate"
+requires = { attention = ["hitl"] }
+delta = {}
+
+[[policy.tool]]
+name = "mcp/volta/volta_key_delete_request"
+requires = { attention = ["hitl"] }
+delta = {}
+
+[[policy.tool]]
+name = "mcp/volta/volta_key_publish"
+requires = { attention = ["hitl"] }
+delta = {}
+
+[[policy.tool]]
+name = "mcp/volta/volta_key_request_verify"
+requires = { attention = ["hitl"] }
+delta = {}
+
+# --- MCP: decapsulation, hard deny by every plausible name ---
+#
+# Volta has no decapsulation tool, by design (SPEC 7.3/8.2: private
+# material never leaves server custody, and no MCP tool performs or
+# exposes decapsulation). APPA tool identities admit no wildcards,
+# so the plausible spellings are declared and blocked here; any
+# other spelling is an undeclared tool, which the covered registry
+# refuses before it runs.
+
+[[policy.tool]]
+name = "mcp/volta/decapsulate"
+requires = { attention = ["blocked"] }
+delta = {}
+
+[[policy.tool]]
+name = "mcp/volta/volta_decapsulate"
+requires = { attention = ["blocked"] }
+delta = {}
+
+[[policy.tool]]
+name = "mcp/volta/volta_ephemeral_decapsulate"
+requires = { attention = ["blocked"] }
+delta = {}
+
+[[policy.tool]]
+name = "mcp/volta/volta_key_decapsulate"
+requires = { attention = ["blocked"] }
+delta = {}
+
+# --- Read and Grep: volta's secret classes are `self` data ---
+#
+# Reading volta's key material or secret files narrows the session
+# to `self`. The battery already labels the generic shapes (private
+# keys by extension, credential and token filenames, the pass store);
+# these are volta's named shapes. A selector matches the path as
+# written, not the resolved path, as in the battery.
+
+[[policy.tool]]
+name = "host/claude-code/Read(file_path:*bootstrap-token*)"
+delta = { audience = ["self"] }
+tags = ["credentials"]
+
+[[policy.tool]]
+name = "host/claude-code/Read(file_path:*bootstrap_token*)"
+delta = { audience = ["self"] }
+tags = ["credentials"]
+
+[[policy.tool]]
+name = "host/claude-code/Read(file_path:*private-key*)"
+delta = { audience = ["self"] }
+tags = ["credentials"]
+
+[[policy.tool]]
+name = "host/claude-code/Read(file_path:*private_key*)"
+delta = { audience = ["self"] }
+tags = ["credentials"]
+
+[[policy.tool]]
+name = "host/claude-code/Read(file_path:*sealed-state*)"
+delta = { audience = ["self"] }
+tags = ["credentials"]
+
+[[policy.tool]]
+name = "host/claude-code/Read(file_path:*sealed_state*)"
+delta = { audience = ["self"] }
+tags = ["credentials"]
+
+[[policy.tool]]
+name = "host/claude-code/Read(file_path:*secret-key*)"
+delta = { audience = ["self"] }
+tags = ["credentials"]
+
+[[policy.tool]]
+name = "host/claude-code/Read(file_path:*secret_key*)"
+delta = { audience = ["self"] }
+tags = ["credentials"]
+
+[[policy.tool]]
+name = "host/claude-code/Read(file_path:*signing-key*)"
+delta = { audience = ["self"] }
+tags = ["credentials"]
+
+[[policy.tool]]
+name = "host/claude-code/Read(file_path:*signing_key*)"
+delta = { audience = ["self"] }
+tags = ["credentials"]
+
+[[policy.tool]]
+name = "host/claude-code/Read(file_path:*token-secret*)"
+delta = { audience = ["self"] }
+tags = ["credentials"]
+
+[[policy.tool]]
+name = "host/claude-code/Read(file_path:*token_secret*)"
+delta = { audience = ["self"] }
+tags = ["credentials"]
+
+[[policy.tool]]
+name = "host/claude-code/Grep(path:*bootstrap-token*)"
+delta = { audience = ["self"] }
+tags = ["credentials"]
+
+[[policy.tool]]
+name = "host/claude-code/Grep(path:*bootstrap_token*)"
+delta = { audience = ["self"] }
+tags = ["credentials"]
+
+[[policy.tool]]
+name = "host/claude-code/Grep(path:*private-key*)"
+delta = { audience = ["self"] }
+tags = ["credentials"]
+
+[[policy.tool]]
+name = "host/claude-code/Grep(path:*private_key*)"
+delta = { audience = ["self"] }
+tags = ["credentials"]
+
+[[policy.tool]]
+name = "host/claude-code/Grep(path:*sealed-state*)"
+delta = { audience = ["self"] }
+tags = ["credentials"]
+
+[[policy.tool]]
+name = "host/claude-code/Grep(path:*sealed_state*)"
+delta = { audience = ["self"] }
+tags = ["credentials"]
+
+[[policy.tool]]
+name = "host/claude-code/Grep(path:*secret-key*)"
+delta = { audience = ["self"] }
+tags = ["credentials"]
+
+[[policy.tool]]
+name = "host/claude-code/Grep(path:*secret_key*)"
+delta = { audience = ["self"] }
+tags = ["credentials"]
+
+[[policy.tool]]
+name = "host/claude-code/Grep(path:*signing-key*)"
+delta = { audience = ["self"] }
+tags = ["credentials"]
+
+[[policy.tool]]
+name = "host/claude-code/Grep(path:*signing_key*)"
+delta = { audience = ["self"] }
+tags = ["credentials"]
+
+[[policy.tool]]
+name = "host/claude-code/Grep(path:*token-secret*)"
+delta = { audience = ["self"] }
+tags = ["credentials"]
+
+[[policy.tool]]
+name = "host/claude-code/Grep(path:*token_secret*)"
+delta = { audience = ["self"] }
+tags = ["credentials"]
+
+# --- Write and Edit: staging zones a narrowed session cannot reach ---
+#
+# Writing to a scratch or staging destination is allowed only while
+# the session audience still contains `public` — that is, before the
+# session has read anything labeled `self`. After a secret-class
+# read, these writes are denied: labeled content does not leave the
+# repo's cleared ground for a staging path, not even a lookalike
+# repo directory spelled to pass as this one.
+
+[[policy.tool]]
+name = "host/claude-code/Edit(file_path:/dev/shm/*)"
+requires = { audience = { contains = ["public"] } }
+delta = {}
+
+[[policy.tool]]
+name = "host/claude-code/Edit(file_path:/home/phaedrus/workspace/repos/volta-*)"
+requires = { audience = { contains = ["public"] } }
+delta = {}
+
+[[policy.tool]]
+name = "host/claude-code/Edit(file_path:/home/phaedrus/workspace/repos/volta_*)"
+requires = { audience = { contains = ["public"] } }
+delta = {}
+
+[[policy.tool]]
+name = "host/claude-code/Edit(file_path:/tmp/*)"
+requires = { audience = { contains = ["public"] } }
+delta = {}
+
+[[policy.tool]]
+name = "host/claude-code/Edit(file_path:/var/tmp/*)"
+requires = { audience = { contains = ["public"] } }
+delta = {}
+
+[[policy.tool]]
+name = "host/claude-code/Write(file_path:/dev/shm/*)"
+requires = { audience = { contains = ["public"] } }
+delta = {}
+
+[[policy.tool]]
+name = "host/claude-code/Write(file_path:/home/phaedrus/workspace/repos/volta-*)"
+requires = { audience = { contains = ["public"] } }
+delta = {}
+
+[[policy.tool]]
+name = "host/claude-code/Write(file_path:/home/phaedrus/workspace/repos/volta_*)"
+requires = { audience = { contains = ["public"] } }
+delta = {}
+
+[[policy.tool]]
+name = "host/claude-code/Write(file_path:/tmp/*)"
+requires = { audience = { contains = ["public"] } }
+delta = {}
+
+[[policy.tool]]
+name = "host/claude-code/Write(file_path:/var/tmp/*)"
+requires = { audience = { contains = ["public"] } }
+delta = {}
+
+[[policy.authority]]
+name = "hitl"
+hint = "Ask the person running this session."
+
+[policy.authority.permits]
+attention = ["hitl"]
+
+[externals]
+timeout_ms = 5000
+max_body_bytes = 65536

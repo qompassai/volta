@@ -1,0 +1,7 @@
+# Adversarial: a decapsulation attempt. Volta ships no such tool,
+# by design; the name is declared here so the attempt is a hard
+# deny, not a remedy an authority could grant.
+mcp/volta/volta_ephemeral_decapsulate {
+  key_id: "k_123"
+}
+expect deny

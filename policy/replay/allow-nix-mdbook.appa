@@ -1,0 +1,10 @@
+# Validation: the flake build and the book build run.
+host/claude-code/Bash {
+  command: "nix build"
+}
+expect allow
+
+host/claude-code/Bash {
+  command: "mdbook build"
+}
+expect allow

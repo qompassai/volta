@@ -1,0 +1,10 @@
+# Validation: the repo's Rust build and test workflows run.
+host/claude-code/Bash {
+  command: "cargo build --workspace"
+}
+expect allow
+
+host/claude-code/Bash {
+  command: "cargo test --workspace"
+}
+expect allow

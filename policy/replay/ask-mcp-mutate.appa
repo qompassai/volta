@@ -1,0 +1,12 @@
+# Ask-tier: volta's mutating MCP tools wait for the person running
+# the session, every time.
+mcp/volta/volta_ephemeral_issue {
+  purpose: "ci signing"
+  suite: "HybridMlKem768X25519"
+}
+expect authority hitl
+
+mcp/volta/volta_key_publish {
+  fingerprint: "0123456789ABCDEF0123456789ABCDEF01234567"
+}
+expect authority hitl

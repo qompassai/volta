@@ -1,0 +1,11 @@
+# Adversarial: publishing from a worker session is hard-denied.
+# Pushes are Pax's, per-job authorization only.
+host/claude-code/Bash {
+  command: "git push origin main"
+}
+expect deny
+
+host/claude-code/Bash {
+  command: "gh repo view qompassai/volta"
+}
+expect deny

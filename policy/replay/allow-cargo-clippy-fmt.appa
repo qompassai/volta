@@ -1,0 +1,10 @@
+# Validation: the repo's lint and format gates run.
+host/claude-code/Bash {
+  command: "cargo clippy --workspace -- -D warnings"
+}
+expect allow
+
+host/claude-code/Bash {
+  command: "cargo fmt --check"
+}
+expect allow

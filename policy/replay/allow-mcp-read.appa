@@ -1,0 +1,10 @@
+# Validation: volta's read-only MCP tools answer without asking.
+mcp/volta/volta_ephemeral_status {
+  key_id: "k_123"
+}
+expect allow
+
+mcp/volta/volta_key_lookup_by_fingerprint {
+  fingerprint: "0123456789ABCDEF0123456789ABCDEF01234567"
+}
+expect allow

@@ -1,0 +1,7 @@
+# Validation: a write of the worker's own content inside the repo
+# lands. No labeled read precedes it in this session.
+host/claude-code/Write {
+  file_path: "/home/phaedrus/workspace/repos/volta/rewrite/crates/volta-core/src/notes.rs"
+  content: "worker notes"
+}
+expect allow

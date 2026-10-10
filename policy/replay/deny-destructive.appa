@@ -1,0 +1,21 @@
+# Adversarial: the pilot's destructive set is hard-denied here too,
+# with no remedy.
+host/claude-code/Bash {
+  command: "rm -rf target"
+}
+expect deny
+
+host/claude-code/Bash {
+  command: "git reset --hard HEAD"
+}
+expect deny
+
+host/claude-code/Bash {
+  command: "git clean -fd"
+}
+expect deny
+
+host/claude-code/Bash {
+  command: "sudo systemctl restart volta"
+}
+expect deny
