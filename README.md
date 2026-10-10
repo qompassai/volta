@@ -1,6 +1,6 @@
 <p align="center">
   <a href="https://www.rust-lang.org/"><img src="https://img.shields.io/badge/Rust-000000?style=for-the-badge&logo=rust&logoColor=white" alt="Rust"></a>
-  <a href="./LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License: Apache 2.0"></a>
+  <a href="./NOTICE"><img src="https://img.shields.io/badge/License-AGPL%203.0%20%7C%20Apache%202.0-blue.svg" alt="License: AGPL 3.0 | Apache 2.0"></a>
 </p>
 
 # Volta
@@ -53,8 +53,14 @@ Pinned by `rust-toolchain.toml`: nightly-2026-09-25
 <details>
 <summary>License</summary>
 
-Apache-2.0 — see [LICENSE](LICENSE). Copyright 2026 Qompass AI.
-Volta is Hagrid-derived; the `dist/` asset tree is upstream material
-and retains its own provenance.
+Dual-licensed where Qompass AI holds the copyright — material
+authored by Qompass AI is available under AGPL-3.0
+([LICENSE-AGPL](LICENSE-AGPL)) **or** Apache-2.0
+([LICENSE](LICENSE)), at your choice. Volta is Hagrid-derived, and
+the upstream-derived portions remain AGPL-3.0 only: the Apache
+choice does not extend to them, so Volta as a combined work is
+distributed under AGPL-3.0. See [NOTICE](NOTICE) for the exact
+boundary. The `dist/` asset tree is upstream material and retains
+its own provenance. Copyright 2026 Qompass AI.
 
 </details>

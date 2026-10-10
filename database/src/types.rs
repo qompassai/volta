@@ -1,20 +1,17 @@
 // #################################################################
 // /qompassai/volta/database/src/types.rs
 // Qompass AI Types
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 // Copyright (c) 2026 Qompass AI
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Volta is derived from Hagrid, the software behind
+// keys.openpgp.org, and this material is licensed under the
+// GNU Affero General Public License, version 3 only (see
+// LICENSE-AGPL). Contributions authored by Qompass AI are
+// dual-licensed under AGPL-3.0 or Apache-2.0 at the
+// recipient's choice (see NOTICE); that choice does not
+// extend to upstream-derived material, which remains
+// AGPL-3.0 only.
 
 use anyhow::Result;
 use std::convert::TryFrom;

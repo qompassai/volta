@@ -1,0 +1,42 @@
+NOTICE — Licensing of Volta
+============================
+
+Volta is derived from Hagrid, the software behind keys.openpgp.org
+(https://gitlab.com/hagrid-keyserver/hagrid). Copyright in the
+upstream code remains with its original authors.
+
+Dual licensing of Qompass AI material
+-------------------------------------
+
+Original material authored by Qompass AI in this repository — new
+code contributions, the documentation, the Nix packaging, and the
+build and test tooling written for this fork — is dual-licensed: you
+may use, copy, modify, and distribute that material under either
+
+  * the GNU Affero General Public License, version 3
+    (see LICENSE-AGPL), or
+  * the Apache License, Version 2.0 (see LICENSE),
+
+at your choice.
+
+Boundary: upstream-derived material stays AGPL-3.0 only
+---------------------------------------------------------
+
+The bulk of the server, database, and command-line crates in this
+repository derives from Hagrid, which is licensed under AGPL-3.0.
+Qompass AI cannot and does not grant Apache-2.0 terms over code it
+did not write: the Apache-2.0 choice above extends only to
+Qompass-authored material, never to upstream-derived portions.
+
+Consequently, Volta as a combined work is distributed under
+AGPL-3.0, and the crate manifests in this repository declare
+AGPL-3.0-only. If you extract a Qompass-authored component on its
+own, the dual grant above applies to that component.
+
+The dist/ tree is upstream material and retains its own provenance
+markings; it is not relicensed by this notice or by anything else in
+this repository.
+
+The former LICENSE-QCDA (Qompass Commercial Distribution
+Agreement) scheme no longer applies to this repository and its text
+is not shipped.
