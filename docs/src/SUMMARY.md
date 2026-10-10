@@ -7,3 +7,4 @@
 - [Operations](operations.md)
 - [Nix Flake](nix.md)
 - [Testing](testing.md)
+- [Licensing](licensing.md)

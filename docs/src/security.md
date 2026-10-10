@@ -41,7 +41,10 @@ unverified email addresses.
   spaces after `Subject:`; the current lettre emits one (the passing
   management-mail assertion agrees). The encoded-subject content
   assertion is unchanged.
-- **License.** Volta is Hagrid-derived. Per the operator's direction
-  the repository is published under Apache-2.0 only (the AGPL/Q-CDA
-  files were removed); the `dist/` tree is upstream material and
-  retains its own provenance markings.
+- **License.** Volta is Hagrid-derived and distributed under
+  AGPL-3.0. Material authored by Qompass AI is dual-licensed
+  AGPL-3.0 or Apache-2.0 at the recipient's choice; the Apache
+  choice does not extend to upstream-derived portions. The
+  `dist/` tree is upstream material and retains its own
+  provenance markings. See the Licensing chapter and the `NOTICE`
+  file at the repository root.
