@@ -1,6 +1,6 @@
 # #################################################################
-# /qompassai/volta/.cargo/config.toml
-# Qompass AI Config
+# /qompassai/volta/rust-toolchain.toml
+# Qompass AI Rust Toolchain
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (c) 2026 Qompass AI
 #
@@ -16,5 +16,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-[build]
-target-dir = ".target"
+[toolchain]
+channel = "nightly-2026-09-25"
+components = ["rustfmt", "clippy"]

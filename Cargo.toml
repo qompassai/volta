@@ -1,3 +1,21 @@
+# #################################################################
+# /qompassai/volta/Cargo.toml
+# Qompass AI Cargo
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Qompass AI
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 [[bin]]
 name = "volta"
 path = "src/main.rs"
@@ -8,11 +26,9 @@ path = "src/delete.rs"
 
 [build-dependencies]
 vergen = "3"
-oqs-sys = { version = "0.11.0+liboqs-0.13.0", optional = true }
 
 [dependencies]
 volta-database = { path = "database" }
-oqs = { version = "0.11.0", optional = true }
 chrono = "0.4.10"
 anyhow = "1"
 rocket = { version = "0.5.0-rc.1", features = ["json"] }
@@ -29,9 +45,9 @@ time = "0.1"
 tempfile = "3.0"
 structopt = "0.2"
 url = "1.6"
-handlebars = "3"
+handlebars = "4"
 num_cpus = "1.0"
-ring = "0.13"
+ring = "0.17"
 base64 = "0.10"
 uuid = { version = "0.7", features = ["v4"] }
 rocket_prometheus = "0.10.0-rc.1"
@@ -50,18 +66,12 @@ features = ["builder", "file-transport", "sendmail-transport"]
 git = "https://github.com/lettre/lettre"
 rev = "245c600c82ee18b766e8729f005ff453a55dce34"
 
-[dependencies.rocket_i18n]
-git = "https://github.com/Plume-org/rocket_i18n"
-branch = "go-async"
-default-features = false
-features = ["rocket"]
 
 [dev-dependencies]
 regex = "1"
 
 [features]
 default = []
-vendor = ["oqs", "oqs-sys"]
 
 [package]
 name = "volta"
@@ -70,7 +80,8 @@ authors = ["Matt A. Porter <map@qompass.ai>"]
 build = "build.rs"
 default-run = "volta"
 edition = "2024"
-license = "AGPL 3.0 AND Q-CDA 1.0"
+license = "Apache-2.0"
+rust-version = "1.89"
 
 [profile.release]
 opt-level = 3
