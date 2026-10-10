@@ -28,7 +28,8 @@
 
 import requests
 from publicsuffix2 import get_sld
-from flask import Flask, request, abort, escape
+from flask import Flask, request, abort
+from markupsafe import escape
 app = Flask(__name__)
 
 GATEWAY_DOMAIN = 'wkd.keys.openpgp.org'
