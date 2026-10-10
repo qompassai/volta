@@ -568,7 +568,7 @@ async fn relay_sync(
         let host = host.clone();
         async move {
             use tokio::io::{AsyncReadExt, AsyncWriteExt};
-            let dialed = volta_proxy::dial(&proxy, "relay-sync", &host, port).await?;
+            let dialed = volta_proxy::dial(&proxy, "relay_sync", &host, port).await?;
             let mut stream = dialed.stream;
             let request = format!(
                 "GET {path} HTTP/1.1\r\nHost: {host}:{port}\r\nAccept: application/json\r\nConnection: close\r\n\r\n"

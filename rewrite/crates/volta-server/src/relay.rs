@@ -178,7 +178,7 @@ pub async fn relay_fetch_key(
         .map_err(|_| VoltaError::ConfigInvalid("peer base_uri".to_string()))?;
     let host = url.host_str().unwrap_or("").to_string();
     let port = url.port_or_known_default().unwrap_or(443);
-    let dialed = volta_proxy::dial(&state.config.proxy, "relay-fetch", &host, port).await?;
+    let dialed = volta_proxy::dial(&state.config.proxy, "relay_fetch", &host, port).await?;
     let mut stream = dialed.stream;
     let request = format!(
         "GET /vks/v1/by-fingerprint/{fingerprint} HTTP/1.1\r\nHost: {host}:{port}\r\nAccept: application/json\r\nConnection: close\r\n\r\n"
@@ -226,7 +226,7 @@ pub async fn relay_fetch_key(
     if served_fingerprint.to_uppercase() != fingerprint.to_uppercase() {
         return Err(VoltaError::RelayPeerMismatch);
     }
-    let via_chain = match state.config.proxy.route_for("relay-fetch") {
+    let via_chain = match state.config.proxy.route_for("relay_fetch") {
         volta_core::config::RouteDecision::Chain(name) => name,
         volta_core::config::RouteDecision::Direct => "direct".to_string(),
         volta_core::config::RouteDecision::Deny => "deny".to_string(),
