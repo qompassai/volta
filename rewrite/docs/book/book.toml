@@ -1,0 +1,125 @@
+# #################################################################
+# /qompassai/volta/rewrite/docs/book/book.toml
+# Qompass AI — volta book
+#
+# Instantiated from the dotfiles mdBook template (primo
+# ~/.config/mdbook/, copied per its quickstart.sh).
+# Deviations from the template, all forced by this machine:
+# - [preprocessor.links] dropped: mdbook-links not installed.
+# - [output.pandoc] dropped: mdbook-pandoc not installed.
+# - mdbook-admonish and mdbook-d2 dropped: both target the
+#   mdBook 0.4 preprocessor JSON and fail fatally under
+#   primo's mdBook 0.5.4 (missing `sections` field). The
+#   remaining preprocessors (footnote, graphviz, katex,
+#   mermaid, pagetoc) are 0.5-compatible here.
+# - The stray top-level `heading-split-level` line (an
+#   unknown [build] field under 0.5) is dropped; the setting
+#   lives under the search section.
+# - The search section's "theme/book.cs" (template typo,
+#   missing s) is corrected to "theme/book.css".
+# - The template's search section carried HTML-level keys
+#   that mdBook 0.5 rejects as unknown search fields; they
+#   are moved to the html section where 0.5 expects them,
+#   and non-mdBook keys are dropped.
+# - The rust edition is "2021": primo's older preprocessor
+#   binaries reject "2024" in this field.
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Qompass AI
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at:
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# #################################################################
+# Reference: https://rust-lang.github.io/mdBook/format/configuration/index.html
+
+[book]
+authors = ["Qompass AI"]
+description = "Volta: an OpenPGP key server for humans and agents — verified publication, ephemeral hybrid post-quantum session keys, chained-proxy relay, passkey operators."
+language = "en"
+src = "src"
+text-direction = "ltr"
+title = "volta"
+
+
+[build]
+build-dir = "book"
+create-missing = true
+extra-watch-dirs = []
+use-default-preprocessors = true
+
+[preprocessor.footnote]
+renderers = ["html"]
+
+[preprocessor.graphviz]
+renderers = ["html"]
+
+[preprocessor.katex]
+renderers = ["html"]
+
+[preprocessor.mermaid]
+renderers = ["html"]
+
+[preprocessor.pagetoc]
+renderers = ["html"]
+
+[output.epub]
+command = "mdbook-epub"
+
+[output.html]
+additional-css = ["theme/book.css"]
+additional-js = ["theme/book.js"]
+cname = "volta.qompass.ai"
+edit-url-template = "https://github.com/qompassai/volta/edit/main/rewrite/docs/book/src/{path}"
+git-repository-icon = "fab-github"
+git-repository-url = "https://github.com/qompassai/volta"
+input-404 = "not-found.md"
+mathjax-support = false
+no-section-label = false
+preferred-dark-theme = "navy"
+site-url = "/volta/"
+smart-punctuation = true
+
+[output.html.code]
+hidelines = { python = "~" }
+
+[output.html.fold]
+enable = false
+level = 0
+
+[output.html.playground]
+copyable = true
+copy-js = true
+editable = false
+line-numbers = false
+runnable = true
+
+[output.html.print]
+enable = true
+page-break = true
+
+[output.html.search]
+boost-hierarchy = 2
+boost-paragraph = 1
+boost-title = 2
+enable = true
+expand = true
+heading-split-level = 3
+limit-results = 30
+teaser-word-count = 30
+use-boolean-and = true
+
+[output.html.search.chapter]
+"appendix" = { enable = false }
+"appendix/glossary.md" = { enable = true }
+
+[output.markdown]
+
+[rust]
+edition = "2021"

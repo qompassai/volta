@@ -1,0 +1,11 @@
+# rewrite/.gitignore - rewrite-local ignore rules.
+#
+# Dual licensed under AGPL-3.0-only OR Apache-2.0.
+
+# The mdBook sources live in docs/book; the repo-root `book/`
+# pattern (meant for mdBook output) would swallow them.
+!docs/book/
+# The generated mdBook output inside it stays ignored.
+docs/book/book/
+# Cargo build output for the rewrite workspace.
+/.target/
