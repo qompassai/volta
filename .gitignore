@@ -7,3 +7,6 @@
 target
 *.po~
 /dist/templates/localized
+book/
+result
+.target/

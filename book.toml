@@ -1,6 +1,6 @@
 # #################################################################
-# /qompassai/volta/shell.nix
-# Qompass AI Flake-Compat Shell Shim
+# /qompassai/volta/book.toml
+# Qompass AI MdBook Configuration
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (c) 2026 Qompass AI
 #
@@ -15,16 +15,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-# Non-flake entry point: lands `nix-shell` users in the same shell
-# flake.nix defines, via flake-compat. The canonical definition is
-# the flake; edit that, not this.
-(import (
-  let
-    lock = builtins.fromJSON (builtins.readFile ./flake.lock);
-  in
-    fetchTarball {
-      url = "https://github.com/edolstra/flake-compat/archive/${lock.nodes.flake-compat.locked.rev}.tar.gz";
-      sha256 = lock.nodes.flake-compat.locked.narHash;
-    }
-) {src = ./.;})
-.shellNix
+
+[book]
+title = "Volta"
+authors = ["Qompass AI"]
+language = "en"
+src = "docs/src"
+
+[build]
+build-dir = "book"
+create-missing = false
