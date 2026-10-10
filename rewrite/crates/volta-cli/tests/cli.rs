@@ -85,7 +85,11 @@ fn import_stats_delete_flow() {
         .arg(&keyring)
         .output()
         .expect("run");
-    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     assert!(String::from_utf8_lossy(&output.stdout).contains("\"imported\":1"));
 
     // Dry run stores nothing new (still exactly one certificate).
@@ -107,7 +111,11 @@ fn import_stats_delete_flow() {
         .arg(ALICE_FPR)
         .output()
         .expect("run");
-    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
 
     let output = Command::new(env!("CARGO_BIN_EXE_voltactl"))
         .args(["-c", config.to_str().expect("path"), "stats"])
@@ -128,8 +136,16 @@ fn mcp_stdio_lists_thirteen_tools() {
         .expect("spawn");
     {
         let stdin = child.stdin.as_mut().expect("stdin");
-        writeln!(stdin, "{{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"initialize\",\"params\":{{}}}}").expect("write");
-        writeln!(stdin, "{{\"id\":2,\"jsonrpc\":\"2.0\",\"method\":\"tools/list\",\"params\":{{}}}}").expect("write");
+        writeln!(
+            stdin,
+            "{{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"initialize\",\"params\":{{}}}}"
+        )
+        .expect("write");
+        writeln!(
+            stdin,
+            "{{\"id\":2,\"jsonrpc\":\"2.0\",\"method\":\"tools/list\",\"params\":{{}}}}"
+        )
+        .expect("write");
     }
     let output = child.wait_with_output().expect("wait");
     assert!(output.status.success());

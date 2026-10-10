@@ -12,11 +12,11 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
-use axum::Json;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use volta_core::config::resolve_secret_ref;
 use volta_core::error::VoltaError;
@@ -61,17 +61,21 @@ pub async fn connect(
     let body = match axum::body::to_bytes(request.into_body(), crate::http_util::BODY_MAX).await {
         Ok(bytes) => bytes,
         Err(_) => {
-            return problem(VoltaError::Validation("body".into()), &request_id).into_response()
+            return problem(VoltaError::Validation("body".into()), &request_id).into_response();
         }
     };
     let parsed: Value = match serde_json::from_slice(&body) {
         Ok(value) => value,
         Err(_) => {
-            return problem(VoltaError::Validation("body".into()), &request_id).into_response()
+            return problem(VoltaError::Validation("body".into()), &request_id).into_response();
         }
     };
     let next = parsed.get("next").cloned().unwrap_or(Value::Null);
-    let host = next.get("host").and_then(Value::as_str).unwrap_or("").to_string();
+    let host = next
+        .get("host")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_string();
     let port = next.get("port").and_then(Value::as_u64).unwrap_or(0) as u16;
     if host.is_empty() || port == 0 {
         return problem(VoltaError::Validation("next".into()), &request_id).into_response();
@@ -83,7 +87,7 @@ pub async fn connect(
                 VoltaError::ProxyHopFailed(format!("relay target: {error}")),
                 &request_id,
             )
-            .into_response()
+            .into_response();
         }
     };
     tokio::spawn(async move {
@@ -95,12 +99,16 @@ pub async fn connect(
     });
     let mut response = Response::new(axum::body::Body::empty());
     *response.status_mut() = StatusCode::SWITCHING_PROTOCOLS;
-    response
-        .headers_mut()
-        .insert("connection", "Upgrade".parse().unwrap_or(axum::http::HeaderValue::from_static("Upgrade")));
-    response
-        .headers_mut()
-        .insert("upgrade", axum::http::HeaderValue::from_static("volta-relay/1"));
+    response.headers_mut().insert(
+        "connection",
+        "Upgrade"
+            .parse()
+            .unwrap_or(axum::http::HeaderValue::from_static("Upgrade")),
+    );
+    response.headers_mut().insert(
+        "upgrade",
+        axum::http::HeaderValue::from_static("volta-relay/1"),
+    );
     response
 }
 
@@ -209,8 +217,7 @@ pub async fn relay_fetch_key(
     if status != 200 {
         return Err(VoltaError::ProxyHopFailed(format!("peer status {status}")));
     }
-    let parsed: Value = serde_json::from_str(&body)
-        .map_err(|_| VoltaError::RelayPeerMismatch)?;
+    let parsed: Value = serde_json::from_str(&body).map_err(|_| VoltaError::RelayPeerMismatch)?;
     let served_fingerprint = parsed
         .get("fingerprint")
         .and_then(Value::as_str)
@@ -242,10 +249,7 @@ fn dechunk(body: &str) -> String {
     }
     let mut out = String::new();
     let mut rest = trimmed;
-    loop {
-        let Some((size_line, tail)) = rest.split_once("\r\n") else {
-            break;
-        };
+    while let Some((size_line, tail)) = rest.split_once("\r\n") {
         let Ok(size) = usize::from_str_radix(size_line.trim(), 16) else {
             break;
         };

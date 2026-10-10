@@ -20,6 +20,6 @@ pub mod mcp;
 pub mod relay;
 pub mod state;
 pub mod vks;
-pub mod webauthn;
 pub mod web;
+pub mod webauthn;
 pub mod wkd_http;

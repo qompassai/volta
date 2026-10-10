@@ -14,8 +14,8 @@ use axum::response::{IntoResponse, Response};
 use volta_core::error::VoltaError;
 use volta_core::model::StoredCertificate;
 use volta_core::pgp_key::{
-    clean_served_form, is_fingerprint, is_long_key_id, normalize_hex_id, parse_and_check,
-    to_armor, to_binary,
+    clean_served_form, is_fingerprint, is_long_key_id, normalize_hex_id, parse_and_check, to_armor,
+    to_binary,
 };
 
 use crate::http_util::{problem, unix_now};
@@ -55,13 +55,18 @@ pub fn ingest_armor(state: &AppState, text: &str) -> Result<Vec<StoredCertificat
     }
     let blocks = armor_blocks(text);
     if blocks.is_empty() {
-        return Err(VoltaError::KeyMalformed("no certificate blocks".to_string()));
+        return Err(VoltaError::KeyMalformed(
+            "no certificate blocks".to_string(),
+        ));
     }
     let mut parsed = Vec::with_capacity(blocks.len());
     for block in &blocks {
         parsed.push(parse_and_check(block.as_bytes())?);
     }
-    let mut store = state.store.lock().map_err(|_| VoltaError::ConfigInvalid("lock".into()))?;
+    let mut store = state
+        .store
+        .lock()
+        .map_err(|_| VoltaError::ConfigInvalid("lock".into()))?;
     let now = unix_now() as i64;
     let mut stored = Vec::with_capacity(parsed.len());
     for parsed_key in &parsed {
@@ -69,10 +74,7 @@ pub fn ingest_armor(state: &AppState, text: &str) -> Result<Vec<StoredCertificat
         // (SCALE-1): self-issued signatures only, no third-party
         // certifications. Nothing is verified yet, so the verified
         // set is empty; self-signed user ids are retained.
-        let cleaned = clean_served_form(
-            &parsed_key.signed_key,
-            &std::collections::BTreeSet::new(),
-        );
+        let cleaned = clean_served_form(&parsed_key.signed_key, &std::collections::BTreeSet::new());
         let binary = to_binary(&cleaned)?;
         let armor = to_armor(&cleaned)?;
         let record = store.put_certificate(parsed_key.meta.clone(), &binary, &armor, now)?;
@@ -90,7 +92,10 @@ pub fn lookup_exact(
     search: &str,
     published_only: bool,
 ) -> Result<StoredCertificate, VoltaError> {
-    let store = state.store.lock().map_err(|_| VoltaError::ConfigInvalid("lock".into()))?;
+    let store = state
+        .store
+        .lock()
+        .map_err(|_| VoltaError::ConfigInvalid("lock".into()))?;
     let normalized = normalize_hex_id(search);
     if is_fingerprint(&normalized) {
         let record = store.get_by_fingerprint(&normalized)?;
@@ -156,10 +161,18 @@ pub async fn lookup(
                         .map(|options| options.split(',').any(|o| o.trim() == "mr"))
                         .unwrap_or(false);
                     if machine {
-                        (StatusCode::OK, [("content-type", "text/plain")], mr_index(&record))
+                        (
+                            StatusCode::OK,
+                            [("content-type", "text/plain")],
+                            mr_index(&record),
+                        )
                             .into_response()
                     } else {
-                        (StatusCode::OK, [("content-type", "text/plain")], human_index(&record))
+                        (
+                            StatusCode::OK,
+                            [("content-type", "text/plain")],
+                            human_index(&record),
+                        )
                             .into_response()
                     }
                 }
@@ -167,15 +180,13 @@ pub async fn lookup(
             }
         }
         "stats" => {
-            let stats = state
-                .store
-                .lock()
-                .map(|store| store.stats())
-                .unwrap_or(volta_core::store::StoreStats {
+            let stats = state.store.lock().map(|store| store.stats()).unwrap_or(
+                volta_core::store::StoreStats {
                     certificates: 0,
                     published_addresses: 0,
                     revoked_certificates: 0,
-                });
+                },
+            );
             axum::Json(serde_json::json!({
                 "certificates": stats.certificates,
                 "published_addresses": stats.published_addresses,
@@ -288,10 +299,7 @@ pub fn escape_uid(text: &str) -> String {
 }
 
 /// POST /pks/add — atomic multi-key add (form field `keytext`).
-pub async fn add(
-    State(state): State<Arc<AppState>>,
-    body: String,
-) -> Response {
+pub async fn add(State(state): State<Arc<AppState>>, body: String) -> Response {
     let request_id = crate::ephemeral::new_request_id();
     let keytext = extract_form_field(&body, "keytext").unwrap_or(body.clone());
     match ingest_armor(&state, &keytext) {
@@ -357,7 +365,11 @@ pub async fn internal_get_armor(
         return problem(VoltaError::InternalOnly, &request_id).into_response();
     }
     match lookup_exact(&state, &fingerprint, false) {
-        Ok(record) => (StatusCode::OK, [("content-type", "application/pgp-keys")], record.armor)
+        Ok(record) => (
+            StatusCode::OK,
+            [("content-type", "application/pgp-keys")],
+            record.armor,
+        )
             .into_response(),
         Err(error) => problem(error, &request_id).into_response(),
     }

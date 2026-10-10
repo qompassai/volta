@@ -42,15 +42,16 @@ pub fn esc(text: &str) -> String {
 
 /// GET / — landing page with live counts.
 pub async fn index(State(state): State<Arc<AppState>>) -> Response {
-    let stats = state
-        .store
-        .lock()
-        .map(|store| store.stats())
-        .unwrap_or(volta_core::store::StoreStats {
-            certificates: 0,
-            published_addresses: 0,
-            revoked_certificates: 0,
-        });
+    let stats =
+        state
+            .store
+            .lock()
+            .map(|store| store.stats())
+            .unwrap_or(volta_core::store::StoreStats {
+                certificates: 0,
+                published_addresses: 0,
+                revoked_certificates: 0,
+            });
     page(
         "volta",
         &format!(
@@ -136,10 +137,7 @@ pub async fn upload_form() -> Response {
 }
 
 /// POST /upload — form upload; shows the manage token once.
-pub async fn upload_submit(
-    State(state): State<Arc<AppState>>,
-    body: String,
-) -> Response {
+pub async fn upload_submit(State(state): State<Arc<AppState>>, body: String) -> Response {
     let request_id = crate::ephemeral::new_request_id();
     let keytext = crate::hkp::extract_form_field(&body, "keytext").unwrap_or(body);
     let result = (|| -> Result<String, VoltaError> {
@@ -180,7 +178,10 @@ pub async fn verify_page(
     match publish_from_verify_token(&state, &token) {
         Ok(address) => page(
             "Verified",
-            &format!("<h1>Verified</h1><p>{} is now published.</p>", esc(&address)),
+            &format!(
+                "<h1>Verified</h1><p>{} is now published.</p>",
+                esc(&address)
+            ),
         )
         .into_response(),
         Err(error) => page(
@@ -205,15 +206,14 @@ pub async fn manage_page(
             now,
             state.config.token_validity_seconds,
         )?;
-        let store = state.store.lock().map_err(|_| VoltaError::ConfigInvalid("lock".into()))?;
+        let store = state
+            .store
+            .lock()
+            .map_err(|_| VoltaError::ConfigInvalid("lock".into()))?;
         let bindings = store.bindings_of(&payload.fingerprint);
         let mut rows = String::new();
         for (address, status) in &bindings {
-            rows.push_str(&format!(
-                "<li>{} — {}</li>",
-                esc(address),
-                status.as_str()
-            ));
+            rows.push_str(&format!("<li>{} — {}</li>", esc(address), status.as_str()));
         }
         Ok(format!(
             "<h1>Manage {}</h1><ul>{}</ul>\
@@ -257,14 +257,17 @@ pub async fn manage_action(
             now,
             state.config.token_validity_seconds,
         )?;
-        let mut store = state.store.lock().map_err(|_| VoltaError::ConfigInvalid("lock".into()))?;
+        let mut store = state
+            .store
+            .lock()
+            .map_err(|_| VoltaError::ConfigInvalid("lock".into()))?;
         match form.action.as_str() {
             "unpublish" => {
                 let address = form
                     .address
                     .clone()
                     .ok_or_else(|| VoltaError::Validation("address".to_string()))?;
-                if !payload.addresses.iter().any(|a| *a == address) {
+                if !payload.addresses.contains(&address) {
                     return Err(VoltaError::VerificationAddressMismatch);
                 }
                 store.set_binding_status(
@@ -299,15 +302,16 @@ fn parse_manage_form(body: &str) -> ManageActionForm {
 /// GET /metrics — counts only (SPEC 12.6: no labels that leak
 /// identities).
 pub async fn metrics(State(state): State<Arc<AppState>>) -> Response {
-    let stats = state
-        .store
-        .lock()
-        .map(|store| store.stats())
-        .unwrap_or(volta_core::store::StoreStats {
-            certificates: 0,
-            published_addresses: 0,
-            revoked_certificates: 0,
-        });
+    let stats =
+        state
+            .store
+            .lock()
+            .map(|store| store.stats())
+            .unwrap_or(volta_core::store::StoreStats {
+                certificates: 0,
+                published_addresses: 0,
+                revoked_certificates: 0,
+            });
     (
         axum::http::StatusCode::OK,
         [("content-type", "text/plain")],
@@ -327,7 +331,11 @@ pub async fn healthz() -> Response {
 /// GET /readyz — readiness, including the A2A signing state
 /// (A2A-1: an unsigned card is a readiness failure for section 9).
 pub async fn readyz(State(state): State<Arc<AppState>>) -> Response {
-    let identity = if state.identity.is_some() { "configured" } else { "absent" };
+    let identity = if state.identity.is_some() {
+        "configured"
+    } else {
+        "absent"
+    };
     axum::Json(serde_json::json!({
         "identity": identity,
         "status": "ready",

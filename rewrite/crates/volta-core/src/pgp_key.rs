@@ -115,8 +115,7 @@ fn parse_key(input: &[u8]) -> VoltaResult<SignedPublicKey> {
             .map_err(|e| VoltaError::KeyMalformed(e.to_string()))?;
         Ok(key)
     } else {
-        SignedPublicKey::from_bytes(input)
-            .map_err(|e| VoltaError::KeyMalformed(e.to_string()))
+        SignedPublicKey::from_bytes(input).map_err(|e| VoltaError::KeyMalformed(e.to_string()))
     }
 }
 
@@ -157,8 +156,7 @@ fn describe(key: &SignedPublicKey) -> CertificateMeta {
         primary_algorithm: algorithm_name(key.algorithm()),
         primary_created_at,
         primary_expires_at: signature_expiration(
-            &key
-                .details
+            &key.details
                 .direct_signatures
                 .iter()
                 .chain(key.details.users.iter().flat_map(|u| u.signatures.iter()))
@@ -195,9 +193,7 @@ fn algorithm_name(algorithm: PublicKeyAlgorithm) -> String {
         PublicKeyAlgorithm::Ed25519 => "ed25519".to_string(),
         PublicKeyAlgorithm::Ed448 => "ed448".to_string(),
         PublicKeyAlgorithm::EdDSALegacy => "eddsa-legacy".to_string(),
-        PublicKeyAlgorithm::Elgamal | PublicKeyAlgorithm::ElgamalEncrypt => {
-            "elgamal".to_string()
-        }
+        PublicKeyAlgorithm::Elgamal | PublicKeyAlgorithm::ElgamalEncrypt => "elgamal".to_string(),
         PublicKeyAlgorithm::MlDsa65Ed25519 => "ml-dsa-65-ed25519".to_string(),
         PublicKeyAlgorithm::MlDsa87Ed448 => "ml-dsa-87-ed448".to_string(),
         PublicKeyAlgorithm::MlKem768X25519 => "ml-kem-768-x25519".to_string(),
@@ -219,12 +215,13 @@ fn algorithm_name(algorithm: PublicKeyAlgorithm) -> String {
 ///
 /// # Errors
 /// `E_CRYPTO_NOT_ALLOWED` naming the first offending algorithm.
-pub fn check_allowlist(
-    key: &SignedPublicKey,
-    meta: &CertificateMeta,
-) -> VoltaResult<Vec<String>> {
+pub fn check_allowlist(key: &SignedPublicKey, meta: &CertificateMeta) -> VoltaResult<Vec<String>> {
     let mut warnings = Vec::new();
-    check_one_key(&meta.primary_algorithm, primary_rsa_bits(key), &mut warnings)?;
+    check_one_key(
+        &meta.primary_algorithm,
+        primary_rsa_bits(key),
+        &mut warnings,
+    )?;
     for sub in &meta.subkeys {
         // Subkey RSA sizes are checked structurally the same way;
         // the size probe covers the primary key, and any RSA subkey
@@ -307,11 +304,7 @@ pub fn clean_served_form(
     verified_emails: &BTreeSet<String>,
 ) -> SignedPublicKey {
     let primary_fpr = key.fingerprint();
-    let self_issued = |sig: &Signature| {
-        sig.issuer_fingerprint()
-            .iter()
-            .any(|issuer| *issuer == &primary_fpr)
-    };
+    let self_issued = |sig: &Signature| sig.issuer_fingerprint().contains(&&primary_fpr);
     let mut cleaned = key.clone();
     cleaned.details.revocation_signatures.retain(&self_issued);
     cleaned.details.direct_signatures.retain(&self_issued);
@@ -381,8 +374,8 @@ mod tests {
         assert_eq!(normalize_hex_id(" abcd "), "ABCD");
         assert!(is_fingerprint(&"A".repeat(40)));
         assert!(!is_fingerprint(&"A".repeat(16)));
-        assert!(is_long_key_id(&"0123456789ABCDEF"));
-        assert!(!is_long_key_id(&"01234567"));
+        assert!(is_long_key_id("0123456789ABCDEF"));
+        assert!(!is_long_key_id("01234567"));
     }
 
     #[test]

@@ -5,7 +5,7 @@
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 
-use volta_core::config::{resolve_secret_ref, ServerConfig};
+use volta_core::config::{ServerConfig, resolve_secret_ref};
 use volta_core::error::VoltaError;
 use volta_core::sealed::TokenSealer;
 use volta_core::store::Store;
@@ -48,7 +48,10 @@ impl RateState {
     /// Take one token from a bucket; false when empty.
     pub fn take(&mut self, key: &str, capacity: f64, refill_per_sec: f64) -> bool {
         let now_ms = crate::http_util::unix_now() * 1000;
-        let entry = self.buckets.entry(key.to_string()).or_insert((capacity, now_ms));
+        let entry = self
+            .buckets
+            .entry(key.to_string())
+            .or_insert((capacity, now_ms));
         let elapsed = (now_ms.saturating_sub(entry.1)) as f64 / 1000.0;
         entry.0 = (entry.0 + elapsed * refill_per_sec).min(capacity);
         entry.1 = now_ms;
@@ -96,8 +99,7 @@ impl AppState {
     /// `E_CONFIG_INVALID` for storage or secret failures.
     pub fn new(config: ServerConfig) -> Result<Self, VoltaError> {
         let data_dir = std::path::PathBuf::from(&config.data_dir);
-        std::fs::create_dir_all(&data_dir)
-            .map_err(|e| VoltaError::ConfigInvalid(e.to_string()))?;
+        std::fs::create_dir_all(&data_dir).map_err(|e| VoltaError::ConfigInvalid(e.to_string()))?;
         let store = Store::open(&data_dir)?;
         let token_secret = resolve_secret_ref(&config.token_secret_ref)?;
         let sealer = TokenSealer::new(&token_secret);
@@ -108,7 +110,10 @@ impl AppState {
                 let seed = resolve_secret_ref(&identity_config.secret_ref)?;
                 let suite = IdentitySuite::parse(&identity_config.suite)?;
                 let signer = IdentitySigner::from_seed(suite, &seed)?;
-                (Some(Arc::new(signer)), Some(identity_config.fingerprint.clone()))
+                (
+                    Some(Arc::new(signer)),
+                    Some(identity_config.fingerprint.clone()),
+                )
             }
             None => (None, None),
         };
@@ -153,7 +158,10 @@ impl AppState {
             "by-fingerprint" => (60.0, 5.0),
             _ => (60.0, 5.0),
         };
-        let mut rate = self.rate.lock().map_err(|_| VoltaError::Forbidden("rate state".into()))?;
+        let mut rate = self
+            .rate
+            .lock()
+            .map_err(|_| VoltaError::Forbidden("rate state".into()))?;
         if rate.take(&format!("{class}:{key}"), capacity, refill) {
             Ok(())
         } else {

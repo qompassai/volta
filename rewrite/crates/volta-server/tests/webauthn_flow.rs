@@ -12,14 +12,14 @@ use std::sync::Arc;
 use axum::body::Body;
 use axum::http::{Request, Response, StatusCode};
 use base64::Engine;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tower::ServiceExt;
 use url::Url;
 use volta_core::config::ServerConfig;
 use volta_server::app::router;
 use volta_server::state::AppState;
-use webauthn_authenticator_rs::softpasskey::SoftPasskey;
 use webauthn_authenticator_rs::AuthenticatorBackend;
+use webauthn_authenticator_rs::softpasskey::SoftPasskey;
 use webauthn_rs::prelude::{CreationChallengeResponse, RequestChallengeResponse};
 
 struct Fixture {
@@ -52,7 +52,10 @@ fn fixture() -> Fixture {
     );
     let config = ServerConfig::from_toml(&toml).expect("config");
     let state = Arc::new(AppState::new(config).expect("state"));
-    Fixture { app: router(state.clone()), state }
+    Fixture {
+        app: router(state.clone()),
+        state,
+    }
 }
 
 async fn send(app: &axum::Router, request: Request<Body>) -> Response<Body> {
@@ -88,12 +91,17 @@ async fn webauthn_register_auth_replay_forgery() {
         .uri("/api/v1/operator/webauthn/register/options")
         .header("content-type", "application/json")
         .header("x-volta-bootstrap", fixture.state.bootstrap_token.clone())
-        .body(Body::from(json!({"nickname": "test key", "operator_id": "op:test"}).to_string()))
+        .body(Body::from(
+            json!({"nickname": "test key", "operator_id": "op:test"}).to_string(),
+        ))
         .expect("request");
     let response = send(&fixture.app, request).await;
     assert_eq!(response.status(), StatusCode::OK);
     let options = json_body(response).await;
-    let challenge_id = options["challenge_id"].as_str().expect("challenge").to_string();
+    let challenge_id = options["challenge_id"]
+        .as_str()
+        .expect("challenge")
+        .to_string();
     let ccr: CreationChallengeResponse =
         serde_json::from_value(options["options"].clone()).expect("ccr");
     let credential = authenticator
@@ -124,7 +132,10 @@ async fn webauthn_register_auth_replay_forgery() {
     .await;
     assert_eq!(response.status(), StatusCode::OK);
     let options = json_body(response).await;
-    let challenge_id = options["challenge_id"].as_str().expect("challenge").to_string();
+    let challenge_id = options["challenge_id"]
+        .as_str()
+        .expect("challenge")
+        .to_string();
     let rcr: RequestChallengeResponse =
         serde_json::from_value(options["options"].clone()).expect("rcr");
     let assertion = authenticator
@@ -141,7 +152,10 @@ async fn webauthn_register_auth_replay_forgery() {
     .await;
     assert_eq!(response.status(), StatusCode::OK);
     let session = json_body(response).await;
-    let token = session["session_token"].as_str().expect("token").to_string();
+    let token = session["session_token"]
+        .as_str()
+        .expect("token")
+        .to_string();
 
     // whoami with the session.
     let request = Request::builder()
@@ -165,7 +179,10 @@ async fn webauthn_register_auth_replay_forgery() {
     .await;
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     assert_eq!(
-        response.headers().get("x-volta-error-code").map(|v| v.to_str().unwrap_or("")),
+        response
+            .headers()
+            .get("x-volta-error-code")
+            .map(|v| v.to_str().unwrap_or("")),
         Some("E_WEBAUTHN_CHALLENGE_INVALID")
     );
 
@@ -180,7 +197,10 @@ async fn webauthn_register_auth_replay_forgery() {
     )
     .await;
     let options = json_body(response).await;
-    let challenge_id = options["challenge_id"].as_str().expect("challenge").to_string();
+    let challenge_id = options["challenge_id"]
+        .as_str()
+        .expect("challenge")
+        .to_string();
     let rcr: RequestChallengeResponse =
         serde_json::from_value(options["options"].clone()).expect("rcr");
     let forged = authenticator
@@ -198,9 +218,8 @@ async fn webauthn_register_auth_replay_forgery() {
     if let Some(first) = sig.first_mut() {
         *first ^= 0xff;
     }
-    forged_json["response"]["signature"] = json!(
-        base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&sig)
-    );
+    forged_json["response"]["signature"] =
+        json!(base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&sig));
     let response = send(
         &fixture.app,
         post_json(

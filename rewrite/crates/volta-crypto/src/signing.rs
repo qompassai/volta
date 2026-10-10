@@ -12,8 +12,14 @@
 //! composite verifying keys are `ml_dsa_vk || ed25519_vk (32)`.
 //! A composite verifies only if BOTH halves verify.
 
-use ed25519_dalek::{Signer as EdSigner, SigningKey as EdSigningKey, Verifier as EdVerifier, VerifyingKey as EdVerifyingKey, Signature as EdSignature};
-use ml_dsa::{Keypair as _, MlDsa87, Signature as MlDsaSignature, SigningKey as MlDsaSigningKey, VerifyingKey as MlDsaVerifyingKey};
+use ed25519_dalek::{
+    Signature as EdSignature, Signer as EdSigner, SigningKey as EdSigningKey,
+    Verifier as EdVerifier, VerifyingKey as EdVerifyingKey,
+};
+use ml_dsa::{
+    Keypair as _, MlDsa87, Signature as MlDsaSignature, SigningKey as MlDsaSigningKey,
+    VerifyingKey as MlDsaVerifyingKey,
+};
 use sha2::{Digest, Sha256};
 use zeroize::Zeroizing;
 
@@ -100,9 +106,9 @@ impl IdentitySigner {
     pub fn from_seed(suite: IdentitySuite, seed: &[u8]) -> VoltaResult<Self> {
         match suite {
             IdentitySuite::EddsaEd25519 => {
-                let seed: [u8; ED25519_LEN] = seed.try_into().map_err(|_| {
-                    VoltaError::CryptoNotAllowed("ed25519 seed length".to_string())
-                })?;
+                let seed: [u8; ED25519_LEN] = seed
+                    .try_into()
+                    .map_err(|_| VoltaError::CryptoNotAllowed("ed25519 seed length".to_string()))?;
                 Ok(Self {
                     ed25519: EdSigningKey::from_bytes(&seed),
                     mldsa: None,
@@ -260,8 +266,7 @@ pub fn verify(
                 .ok_or_else(|| VoltaError::CryptoNotAllowed("ml-dsa sig".to_string()))?;
             let mut framed = MLDSA_CONTEXT.to_vec();
             framed.extend_from_slice(message);
-            let mldsa_ok: bool =
-                ml_dsa::Verifier::verify(&mldsa_vk, &framed, &mldsa_sig).is_ok();
+            let mldsa_ok: bool = ml_dsa::Verifier::verify(&mldsa_vk, &framed, &mldsa_sig).is_ok();
             Ok(ed_ok && mldsa_ok)
         }
     }
@@ -314,9 +319,6 @@ mod tests {
         // Ed25519 half from A, ML-DSA half from B: must fail.
         let mut mixed = sig_a[..ED25519_SIGNATURE_LEN].to_vec();
         mixed.extend_from_slice(&sig_b[ED25519_SIGNATURE_LEN..]);
-        assert!(
-            !verify(suite, &signer_a.verifying_key_bytes(), b"card", &mixed)
-                .expect("verify")
-        );
+        assert!(!verify(suite, &signer_a.verifying_key_bytes(), b"card", &mixed).expect("verify"));
     }
 }

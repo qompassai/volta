@@ -2,11 +2,11 @@
 //!
 //! Dual licensed under AGPL-3.0-only OR Apache-2.0.
 
+use axum::Json;
 use axum::http::{HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Response};
-use axum::Json;
-use base64::engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD};
 use base64::Engine;
+use base64::engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD};
 use serde_json::json;
 use sha2::{Digest, Sha256};
 use volta_core::error::VoltaError;

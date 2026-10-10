@@ -11,7 +11,7 @@
 use axum::http::HeaderMap;
 use volta_core::config::PrincipalConfig;
 use volta_core::error::VoltaError;
-use volta_crypto::signing::{canonical_request, verify, IdentitySuite};
+use volta_crypto::signing::{IdentitySuite, canonical_request, verify};
 
 use crate::http_util::{b64_decode, unix_now};
 use crate::state::AppState;
@@ -180,7 +180,11 @@ pub fn require_authenticated(caller: &Caller) -> Result<(), VoltaError> {
 /// # Errors
 /// `E_AUTH_REQUIRED` for anonymous callers; `E_FORBIDDEN` when an
 /// operator session's step-up is stale.
-pub fn require_step_up(state: &AppState, caller: &Caller, headers: &HeaderMap) -> Result<(), VoltaError> {
+pub fn require_step_up(
+    state: &AppState,
+    caller: &Caller,
+    headers: &HeaderMap,
+) -> Result<(), VoltaError> {
     match caller {
         Caller::Anonymous => Err(VoltaError::AuthRequired),
         Caller::Principal { .. } => Ok(()),

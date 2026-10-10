@@ -10,14 +10,13 @@
 
 mod delete;
 
-use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use base64::engine::general_purpose::STANDARD as B64;
 use base64::Engine;
+use base64::engine::general_purpose::STANDARD as B64;
 use clap::{Parser, Subcommand};
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 use volta_core::config::ServerConfig;
 use volta_core::error::VoltaError;
 use volta_core::store::Store;
@@ -152,16 +151,21 @@ fn run(cli: Cli) -> i32 {
     }
 }
 
-async fn dispatch(
-    config_arg: &Option<PathBuf>,
-    command: Command,
-) -> Result<Value, VoltaError> {
+async fn dispatch(config_arg: &Option<PathBuf>, command: Command) -> Result<Value, VoltaError> {
     match command {
-        Command::Audit { operator, since, verify_chain } => {
+        Command::Audit {
+            operator,
+            since,
+            verify_chain,
+        } => {
             let config = load_config(config_arg)?;
             audit(&config, operator, since, verify_chain)
         }
-        Command::Delete { all, all_bindings, query } => {
+        Command::Delete {
+            all,
+            all_bindings,
+            query,
+        } => {
             let config = load_config(config_arg)?;
             let mut store = Store::open(&config.data_dir)?;
             delete::delete(&mut store, &query, all, all_bindings)
@@ -355,7 +359,11 @@ async fn mcp_stdio(config: ServerConfig, operator: Option<PathBuf>) -> Result<Va
     use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
     let mut lines = BufReader::new(tokio::io::stdin()).lines();
     let mut stdout = tokio::io::stdout();
-    while let Some(line) = lines.next_line().await.map_err(|e| VoltaError::Validation(e.to_string()))? {
+    while let Some(line) = lines
+        .next_line()
+        .await
+        .map_err(|e| VoltaError::Validation(e.to_string()))?
+    {
         if line.trim().is_empty() {
             continue;
         }
@@ -408,7 +416,10 @@ async fn mcp_stdio(config: ServerConfig, operator: Option<PathBuf>) -> Result<Va
             .write_all(out.as_bytes())
             .await
             .map_err(|e| VoltaError::Validation(e.to_string()))?;
-        stdout.flush().await.map_err(|e| VoltaError::Validation(e.to_string()))?;
+        stdout
+            .flush()
+            .await
+            .map_err(|e| VoltaError::Validation(e.to_string()))?;
     }
     Ok(json!({"mcp": "stdio session ended"}))
 }
@@ -538,7 +549,11 @@ fn regenerate(config: &ServerConfig) -> Result<Value, VoltaError> {
 /// Manual relay sync (SPEC 12.4): fetch the peer's root and
 /// change feed through the configured chain (never direct unless
 /// the routing table says so in words, CHAIN-2).
-async fn relay_sync(config: &ServerConfig, peer_name: &str, dry_run: bool) -> Result<Value, VoltaError> {
+async fn relay_sync(
+    config: &ServerConfig,
+    peer_name: &str,
+    dry_run: bool,
+) -> Result<Value, VoltaError> {
     let peer = config
         .relay_peers
         .iter()
@@ -579,8 +594,7 @@ async fn relay_sync(config: &ServerConfig, peer_name: &str, dry_run: bool) -> Re
             }
             let text = String::from_utf8_lossy(&raw).to_string();
             let body = text.split("\r\n\r\n").nth(1).unwrap_or("").to_string();
-            serde_json::from_str::<Value>(&body)
-                .map_err(|_| VoltaError::RelayPeerMismatch)
+            serde_json::from_str::<Value>(&body).map_err(|_| VoltaError::RelayPeerMismatch)
         }
     };
     let root = fetch("/relay/v1/root".to_string()).await?;

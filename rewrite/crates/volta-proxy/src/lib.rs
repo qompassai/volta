@@ -30,7 +30,7 @@ use tokio::net::TcpStream;
 use tokio::time::timeout;
 
 use volta_core::config::{
-    resolve_secret_ref, ChainConfig, HopConfig, HopType, ProxyConfig, RouteDecision,
+    ChainConfig, HopConfig, HopType, ProxyConfig, RouteDecision, resolve_secret_ref,
 };
 use volta_core::error::{VoltaError, VoltaResult};
 
@@ -267,9 +267,7 @@ async fn upgrade_tls(stream: TcpStream, hop: &HopConfig) -> VoltaResult<ChainStr
                     if &actual == expected {
                         Ok(ServerCertVerified::assertion())
                     } else {
-                        Err(rustls::Error::General(
-                            "spki pin mismatch".to_string(),
-                        ))
+                        Err(rustls::Error::General("spki pin mismatch".to_string()))
                     }
                 }
             }
@@ -354,9 +352,7 @@ async fn upgrade_tls(stream: TcpStream, hop: &HopConfig) -> VoltaResult<ChainStr
 fn spki_sha256(certificate_der: &[u8]) -> Vec<u8> {
     use der::Encode;
     use sha2::{Digest, Sha256};
-    let Ok(certificate) =
-        <x509_cert::Certificate as der::Decode>::from_der(certificate_der)
-    else {
+    let Ok(certificate) = <x509_cert::Certificate as der::Decode>::from_der(certificate_der) else {
         return Vec::new();
     };
     let spki = &certificate.tbs_certificate.subject_public_key_info;
@@ -546,7 +542,9 @@ async fn socks(
         .await
         .map_err(|e| VoltaError::ProxyHopFailed(e.to_string()))?;
     if head[0] != 0x05 {
-        return Err(VoltaError::ProxyHopFailed("socks reply version".to_string()));
+        return Err(VoltaError::ProxyHopFailed(
+            "socks reply version".to_string(),
+        ));
     }
     if head[1] != 0x00 {
         return Err(VoltaError::ProxyHopFailed(format!(
@@ -581,12 +579,11 @@ async fn http_connect(
     next_host: &str,
     next_port: u16,
 ) -> VoltaResult<()> {
-    let mut request = format!(
-        "CONNECT {next_host}:{next_port} HTTP/1.1\r\nHost: {next_host}:{next_port}\r\n"
-    );
+    let mut request =
+        format!("CONNECT {next_host}:{next_port} HTTP/1.1\r\nHost: {next_host}:{next_port}\r\n");
     if let Some((username, password)) = hop_userpass(hop)? {
-        let encoded = base64::engine::general_purpose::STANDARD
-            .encode(format!("{username}:{password}"));
+        let encoded =
+            base64::engine::general_purpose::STANDARD.encode(format!("{username}:{password}"));
         request.push_str(&format!("Proxy-Authorization: Basic {encoded}\r\n"));
     }
     request.push_str("\r\n");
@@ -636,8 +633,7 @@ async fn volta_relay(
     let mut token = String::new();
     if let Some(auth) = &hop.auth {
         if let Some(reference) = &auth.secret_ref {
-            let secret =
-                resolve_secret_ref(reference).map_err(|_| VoltaError::ProxyAuthFailed)?;
+            let secret = resolve_secret_ref(reference).map_err(|_| VoltaError::ProxyAuthFailed)?;
             token = String::from_utf8(secret).map_err(|_| VoltaError::ProxyAuthFailed)?;
         }
     }
@@ -695,9 +691,10 @@ pub async fn check_chain(
     probe_host: &str,
     probe_port: u16,
 ) -> VoltaResult<(bool, Vec<HopReport>)> {
-    let chain = proxy.chains.get(chain_name).ok_or_else(|| {
-        VoltaError::ConfigInvalid(format!("unknown chain {chain_name}"))
-    })?;
+    let chain = proxy
+        .chains
+        .get(chain_name)
+        .ok_or_else(|| VoltaError::ConfigInvalid(format!("unknown chain {chain_name}")))?;
     match dial_chain(chain, "chain_check", probe_host, probe_port).await {
         Ok(dialed) => Ok((true, dialed.hops)),
         Err(error) => Ok((
@@ -810,11 +807,8 @@ mod tests {
                     let _ = socket
                         .write_all(&[0x05, 0x00, 0x00, 0x01, 0, 0, 0, 0, 0, 0])
                         .await;
-                    if let Ok(mut upstream) =
-                        TcpStream::connect(("127.0.0.1", target_port)).await
-                    {
-                        let _ = tokio::io::copy_bidirectional(&mut socket, &mut upstream)
-                            .await;
+                    if let Ok(mut upstream) = TcpStream::connect(("127.0.0.1", target_port)).await {
+                        let _ = tokio::io::copy_bidirectional(&mut socket, &mut upstream).await;
                     }
                 });
             }

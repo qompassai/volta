@@ -14,10 +14,12 @@
 
 use hkdf::Hkdf;
 use kem::{Decapsulate, Encapsulate};
-use ml_kem::{EncodedSizeUser, KemCore, MlKem1024, MlKem768};
-use rand_core::{CryptoRngCore, RngCore};
+use ml_kem::{EncodedSizeUser, KemCore, MlKem768, MlKem1024};
+use rand_core::CryptoRngCore;
 use sha2::Sha512;
-use x25519_dalek::{EphemeralSecret as X25519Ephemeral, PublicKey as X25519Public, StaticSecret as X25519Static};
+use x25519_dalek::{
+    EphemeralSecret as X25519Ephemeral, PublicKey as X25519Public, StaticSecret as X25519Static,
+};
 use zeroize::Zeroizing;
 
 use volta_core::error::{VoltaError, VoltaResult};
@@ -131,7 +133,7 @@ pub fn generate_keypair(suite: Suite, rng: &mut impl CryptoRngCore) -> KemKeypai
             let (dk, ek) = MlKem768::generate(rng);
             let classical = X25519Static::random_from_rng(&mut *rng);
             let mut secret = dk.as_bytes().to_vec();
-            secret.extend_from_slice(&ek.as_bytes().to_vec());
+            secret.extend_from_slice(ek.as_bytes().as_slice());
             secret.extend_from_slice(&classical.to_bytes());
             KemKeypair {
                 classical_public: X25519Public::from(&classical).as_bytes().to_vec(),
@@ -143,7 +145,7 @@ pub fn generate_keypair(suite: Suite, rng: &mut impl CryptoRngCore) -> KemKeypai
         Suite::HybridMlKem1024X448 | Suite::MlKem1024 | Suite::VoltaHybridMlKem1024X25519 => {
             let (dk, ek) = MlKem1024::generate(rng);
             let mut secret = dk.as_bytes().to_vec();
-            secret.extend_from_slice(&ek.as_bytes().to_vec());
+            secret.extend_from_slice(ek.as_bytes().as_slice());
             let classical_public = match suite {
                 Suite::HybridMlKem1024X448 => {
                     let mut classical_bytes = [0u8; X448_LEN];
@@ -196,9 +198,10 @@ pub fn encapsulate(
                     "x25519 public material length".to_string(),
                 ));
             }
-            let peer = X25519Public::from(<[u8; X25519_LEN]>::try_from(classical_public).map_err(
-                |_| VoltaError::CryptoNotAllowed("x25519 public material".to_string()),
-            )?);
+            let peer =
+                X25519Public::from(<[u8; X25519_LEN]>::try_from(classical_public).map_err(
+                    |_| VoltaError::CryptoNotAllowed("x25519 public material".to_string()),
+                )?);
             let ephemeral = X25519Ephemeral::random_from_rng(&mut *rng);
             let ct = X25519Public::from(&ephemeral).as_bytes().to_vec();
             let ss = ephemeral.diffie_hellman(&peer);
@@ -215,9 +218,8 @@ pub fn encapsulate(
                     "x448 public material length".to_string(),
                 ));
             }
-            let peer = x448::PublicKey::from_bytes(classical_public).ok_or_else(|| {
-                VoltaError::CryptoNotAllowed("x448 public material".to_string())
-            })?;
+            let peer = x448::PublicKey::from_bytes(classical_public)
+                .ok_or_else(|| VoltaError::CryptoNotAllowed("x448 public material".to_string()))?;
             let mut ephemeral_bytes = [0u8; X448_LEN];
             rng.fill_bytes(&mut ephemeral_bytes);
             let ephemeral = x448::StaticSecret::from(ephemeral_bytes);
@@ -233,9 +235,9 @@ pub fn encapsulate(
     };
     let (kem_ct, kem_ss): (Vec<u8>, Vec<u8>) = match suite {
         Suite::HybridMlKem768X25519 => {
-            let encoded = ml_kem::Encoded::<
-                <MlKem768 as KemCore>::EncapsulationKey,
-            >::from_slice(kem_public);
+            let encoded =
+                ml_kem::Encoded::<<MlKem768 as KemCore>::EncapsulationKey>::try_from(kem_public)
+                    .map_err(|_| VoltaError::CryptoNotAllowed("ml-kem-768 public length".into()))?;
             let ek = <MlKem768 as KemCore>::EncapsulationKey::from_bytes(&encoded);
             let (ct, ss) = ek
                 .encapsulate(rng)
@@ -243,9 +245,9 @@ pub fn encapsulate(
             (ct.to_vec(), ss.to_vec())
         }
         _ => {
-            let encoded = ml_kem::Encoded::<
-                <MlKem1024 as KemCore>::EncapsulationKey,
-            >::from_slice(kem_public);
+            let encoded =
+                ml_kem::Encoded::<<MlKem1024 as KemCore>::EncapsulationKey>::try_from(kem_public)
+                    .map_err(|_| VoltaError::CryptoNotAllowed("ml-kem-1024 public length".into()))?;
             let ek = <MlKem1024 as KemCore>::EncapsulationKey::from_bytes(&encoded);
             let (ct, ss) = ek
                 .encapsulate(rng)
@@ -293,9 +295,7 @@ pub fn decapsulate(
     let dk_len = secret_material
         .len()
         .checked_sub(classical_len + kem_public_len)
-        .ok_or_else(|| {
-            VoltaError::CryptoNotAllowed("secret material length".to_string())
-        })?;
+        .ok_or_else(|| VoltaError::CryptoNotAllowed("secret material length".to_string()))?;
     let (dk_bytes, rest) = secret_material.split_at(dk_len);
     let (kem_public_bytes, classical_secret) = rest.split_at(kem_public_len);
     let peer_classical_public = classical_ct;
@@ -308,14 +308,12 @@ pub fn decapsulate(
                 ));
             }
             let secret = X25519Static::from(
-                <[u8; X25519_LEN]>::try_from(classical_secret).map_err(|_| {
-                    VoltaError::CryptoNotAllowed("x25519 secret".to_string())
-                })?,
+                <[u8; X25519_LEN]>::try_from(classical_secret)
+                    .map_err(|_| VoltaError::CryptoNotAllowed("x25519 secret".to_string()))?,
             );
             let peer = X25519Public::from(
-                <[u8; X25519_LEN]>::try_from(classical_ct).map_err(|_| {
-                    VoltaError::CryptoNotAllowed("x25519 ciphertext".to_string())
-                })?,
+                <[u8; X25519_LEN]>::try_from(classical_ct)
+                    .map_err(|_| VoltaError::CryptoNotAllowed("x25519 ciphertext".to_string()))?,
             );
             let ss = secret.diffie_hellman(&peer);
             if !ss.was_contributory() {
@@ -332,13 +330,11 @@ pub fn decapsulate(
                 ));
             }
             let secret = x448::StaticSecret::from(
-                <[u8; X448_LEN]>::try_from(classical_secret).map_err(|_| {
-                    VoltaError::CryptoNotAllowed("x448 secret".to_string())
-                })?,
+                <[u8; X448_LEN]>::try_from(classical_secret)
+                    .map_err(|_| VoltaError::CryptoNotAllowed("x448 secret".to_string()))?,
             );
-            let peer = x448::PublicKey::from_bytes(classical_ct).ok_or_else(|| {
-                VoltaError::CryptoNotAllowed("x448 ciphertext".to_string())
-            })?;
+            let peer = x448::PublicKey::from_bytes(classical_ct)
+                .ok_or_else(|| VoltaError::CryptoNotAllowed("x448 ciphertext".to_string()))?;
             let ss = secret.diffie_hellman(&peer);
             if ss.as_bytes().iter().all(|b| *b == 0) {
                 return Err(VoltaError::CryptoNotAllowed(
@@ -351,9 +347,11 @@ pub fn decapsulate(
     let kem_ss: Vec<u8> = match suite {
         Suite::HybridMlKem768X25519 => {
             let encoded =
-                ml_kem::Encoded::<<MlKem768 as KemCore>::DecapsulationKey>::from_slice(dk_bytes);
+                ml_kem::Encoded::<<MlKem768 as KemCore>::DecapsulationKey>::try_from(dk_bytes)
+                    .map_err(|_| VoltaError::CryptoNotAllowed("ml-kem-768 secret length".into()))?;
             let dk = <MlKem768 as KemCore>::DecapsulationKey::from_bytes(&encoded);
-            let ct = ml_kem::Ciphertext::<MlKem768>::from_slice(kem_ct);
+            let ct = ml_kem::Ciphertext::<MlKem768>::try_from(kem_ct)
+                .map_err(|_| VoltaError::CryptoNotAllowed("ml-kem-768 ciphertext length".into()))?;
             let ss = dk
                 .decapsulate(&ct)
                 .map_err(|()| VoltaError::CryptoNotAllowed("ml-kem-768 decapsulate".into()))?;
@@ -361,9 +359,14 @@ pub fn decapsulate(
         }
         _ => {
             let encoded =
-                ml_kem::Encoded::<<MlKem1024 as KemCore>::DecapsulationKey>::from_slice(dk_bytes);
+                ml_kem::Encoded::<<MlKem1024 as KemCore>::DecapsulationKey>::try_from(dk_bytes)
+                    .map_err(|_| {
+                        VoltaError::CryptoNotAllowed("ml-kem-1024 secret length".into())
+                    })?;
             let dk = <MlKem1024 as KemCore>::DecapsulationKey::from_bytes(&encoded);
-            let ct = ml_kem::Ciphertext::<MlKem1024>::from_slice(kem_ct);
+            let ct = ml_kem::Ciphertext::<MlKem1024>::try_from(kem_ct).map_err(|_| {
+                VoltaError::CryptoNotAllowed("ml-kem-1024 ciphertext length".into())
+            })?;
             let ss = dk
                 .decapsulate(&ct)
                 .map_err(|()| VoltaError::CryptoNotAllowed("ml-kem-1024 decapsulate".into()))?;
@@ -401,8 +404,7 @@ fn classical_public_of(suite: Suite, classical_secret: &[u8]) -> Vec<u8> {
         Suite::HybridMlKem1024X448 => {
             if classical_secret.len() == X448_LEN {
                 let secret = x448::StaticSecret::from(
-                    <[u8; X448_LEN]>::try_from(classical_secret)
-                        .expect("length checked by caller"),
+                    <[u8; X448_LEN]>::try_from(classical_secret).expect("length checked by caller"),
                 );
                 x448::PublicKey::from(&secret).as_bytes().to_vec()
             } else {
@@ -432,8 +434,12 @@ fn combine(
         return out;
     }
     let mut ikm = Vec::with_capacity(
-        classical_ss.len() + kem_ss.len() + classical_ct.len() + kem_ct.len()
-            + classical_pk.len() + kem_pk.len(),
+        classical_ss.len()
+            + kem_ss.len()
+            + classical_ct.len()
+            + kem_ct.len()
+            + classical_pk.len()
+            + kem_pk.len(),
     );
     ikm.extend_from_slice(classical_ss);
     ikm.extend_from_slice(kem_ss);
@@ -462,8 +468,8 @@ mod tests {
             &mut rng,
         )
         .expect("encapsulate");
-        let secret_b = decapsulate(suite, &keypair.secret_material, &ciphertext)
-            .expect("decapsulate");
+        let secret_b =
+            decapsulate(suite, &keypair.secret_material, &ciphertext).expect("decapsulate");
         assert_eq!(*secret_a, *secret_b);
         assert_ne!(*secret_a, [0u8; SHARED_SECRET_LEN]);
     }
@@ -480,10 +486,7 @@ mod tests {
     fn aliases_and_weak_suites_are_rejected() {
         for bad in ["kyber1024", "pqc", "rsa", "ecdh", "mlkem512", ""] {
             assert!(
-                matches!(
-                    Suite::parse(bad),
-                    Err(VoltaError::CryptoNotAllowed(_))
-                ),
+                matches!(Suite::parse(bad), Err(VoltaError::CryptoNotAllowed(_))),
                 "suite {bad} must be rejected"
             );
         }

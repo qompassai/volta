@@ -12,12 +12,12 @@ use std::sync::Arc;
 
 use axum::body::Body;
 use axum::http::{Request, Response, StatusCode};
-use base64::engine::general_purpose::STANDARD as B64;
 use base64::Engine;
-use serde_json::{json, Value};
+use base64::engine::general_purpose::STANDARD as B64;
+use serde_json::{Value, json};
 use tower::ServiceExt;
 use volta_core::config::ServerConfig;
-use volta_crypto::signing::{canonical_request, IdentitySigner, IdentitySuite};
+use volta_crypto::signing::{IdentitySigner, IdentitySuite, canonical_request};
 use volta_server::app::router;
 use volta_server::state::AppState;
 
@@ -28,6 +28,7 @@ const ALICE_FPR: &str = "B75FDD3A562A4951988BA325BAA8C11D29B6FDC9";
 struct Fixture {
     app: axum::Router,
     principal: IdentitySigner,
+    #[allow(dead_code)]
     state: Arc<AppState>,
     #[allow(dead_code)]
     dir: std::path::PathBuf,
@@ -38,8 +39,10 @@ fn fixture() -> Fixture {
     std::fs::create_dir_all(&dir).expect("tempdir");
     std::fs::write(dir.join("token-secret"), [7u8; 32]).expect("secret");
     std::fs::write(dir.join("identity-seed"), [3u8; 32]).expect("seed");
-    let identity = IdentitySigner::from_seed(IdentitySuite::EddsaEd25519, &[3u8; 32]).expect("identity");
-    let principal = IdentitySigner::from_seed(IdentitySuite::EddsaEd25519, &[9u8; 32]).expect("principal");
+    let identity =
+        IdentitySigner::from_seed(IdentitySuite::EddsaEd25519, &[3u8; 32]).expect("identity");
+    let principal =
+        IdentitySigner::from_seed(IdentitySuite::EddsaEd25519, &[9u8; 32]).expect("principal");
     let toml = format!(
         "base_uri = \"https://localhost:8737\"\n\
          bind = \"127.0.0.1:0\"\n\
@@ -77,7 +80,12 @@ fn fixture() -> Fixture {
     let config = ServerConfig::from_toml(&toml).expect("config");
     let state = Arc::new(AppState::new(config).expect("state"));
     let app = router(state.clone());
-    Fixture { app, principal, state, dir }
+    Fixture {
+        app,
+        principal,
+        state,
+        dir,
+    }
 }
 
 async fn send(app: &axum::Router, request: Request<Body>) -> Response<Body> {
@@ -97,7 +105,11 @@ async fn json_body(response: Response<Body>) -> Value {
 }
 
 fn get(uri: &str) -> Request<Body> {
-    Request::builder().method("GET").uri(uri).body(Body::empty()).expect("request")
+    Request::builder()
+        .method("GET")
+        .uri(uri)
+        .body(Body::empty())
+        .expect("request")
 }
 
 fn post_json(uri: &str, body: &Value) -> Request<Body> {
@@ -110,12 +122,7 @@ fn post_json(uri: &str, body: &Value) -> Request<Body> {
 }
 
 /// Sign a request as the test principal (SPEC 7.5).
-fn signed(
-    fixture: &Fixture,
-    method: &str,
-    path: &str,
-    body: &[u8],
-) -> Vec<(String, String)> {
+fn signed(fixture: &Fixture, method: &str, path: &str, body: &[u8]) -> Vec<(String, String)> {
     let timestamp = volta_server::http_util::unix_now() as i64;
     let canonical = canonical_request(method, path, timestamp, body);
     let signature = fixture.principal.sign(&canonical);
@@ -165,14 +172,20 @@ async fn hkp_vks_wkd_roundtrip() {
     add_alice(&fixture).await;
 
     // HKP get by fingerprint.
-    let response = send(&fixture.app, get(&format!("/pks/lookup?op=get&search={ALICE_FPR}"))).await;
+    let response = send(
+        &fixture.app,
+        get(&format!("/pks/lookup?op=get&search={ALICE_FPR}")),
+    )
+    .await;
     assert_eq!(response.status(), StatusCode::OK);
     assert!(text(response).await.contains("BEGIN PGP PUBLIC KEY BLOCK"));
 
     // HKP machine-readable index.
     let response = send(
         &fixture.app,
-        get(&format!("/pks/lookup?op=index&options=mr&search={ALICE_FPR}")),
+        get(&format!(
+            "/pks/lookup?op=index&options=mr&search={ALICE_FPR}"
+        )),
     )
     .await;
     let body = text(response).await;
@@ -180,7 +193,11 @@ async fn hkp_vks_wkd_roundtrip() {
     assert!(body.contains("pub:"), "{body}");
 
     // VKS by-fingerprint serves before verification; by-email does not.
-    let response = send(&fixture.app, get(&format!("/vks/v1/by-fingerprint/{ALICE_FPR}"))).await;
+    let response = send(
+        &fixture.app,
+        get(&format!("/vks/v1/by-fingerprint/{ALICE_FPR}")),
+    )
+    .await;
     assert_eq!(response.status(), StatusCode::OK);
     let response = send(&fixture.app, get("/vks/v1/by-email/alice@example.org")).await;
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
@@ -216,11 +233,17 @@ async fn hkp_vks_wkd_roundtrip() {
     let hash = volta_core::wkd::wkd_hash("alice");
     let response = send(
         &fixture.app,
-        get(&format!("/.well-known/openpgpkey/example.org/hu/{hash}?l=alice")),
+        get(&format!(
+            "/.well-known/openpgpkey/example.org/hu/{hash}?l=alice"
+        )),
     )
     .await;
     assert_eq!(response.status(), StatusCode::OK);
-    let response = send(&fixture.app, get("/.well-known/openpgpkey/example.org/policy")).await;
+    let response = send(
+        &fixture.app,
+        get("/.well-known/openpgpkey/example.org/policy"),
+    )
+    .await;
     assert_eq!(text(response).await, "mailbox-only\nprotocol-version: 1\n");
 }
 
@@ -235,7 +258,10 @@ async fn adversarial_uploads_rejected() {
     .await;
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     assert_eq!(
-        response.headers().get("x-volta-error-code").map(|v| v.to_str().unwrap_or("")),
+        response
+            .headers()
+            .get("x-volta-error-code")
+            .map(|v| v.to_str().unwrap_or("")),
         Some("E_CRYPTO_NOT_ALLOWED")
     );
     // Malformed material.
@@ -285,7 +311,10 @@ async fn ephemeral_flow_and_abuse() {
     let response = send(&fixture.app, request).await;
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     assert_eq!(
-        response.headers().get("x-volta-error-code").map(|v| v.to_str().unwrap_or("")),
+        response
+            .headers()
+            .get("x-volta-error-code")
+            .map(|v| v.to_str().unwrap_or("")),
         Some("E_TTL_OUT_OF_BOUNDS")
     );
 
@@ -299,10 +328,18 @@ async fn ephemeral_flow_and_abuse() {
     let record = json_body(response).await;
     let key_id = record["key_id"].as_str().expect("key_id").to_string();
     let kem_public = B64
-        .decode(record["public_material"]["kem_public_b64"].as_str().expect("kem"))
+        .decode(
+            record["public_material"]["kem_public_b64"]
+                .as_str()
+                .expect("kem"),
+        )
         .expect("b64");
     let classical_public = B64
-        .decode(record["public_material"]["classical_public_b64"].as_str().expect("classical"))
+        .decode(
+            record["public_material"]["classical_public_b64"]
+                .as_str()
+                .expect("classical"),
+        )
         .expect("b64");
 
     // Encapsulate as a peer, register the session, decapsulate as
@@ -347,7 +384,11 @@ async fn ephemeral_flow_and_abuse() {
     // Revoke, then the key answers 410 E_KEY_REVOKED.
     let path = format!("/api/v1/ephemeral-keys/{key_id}");
     let request = with_headers(
-        Request::builder().method("DELETE").uri(&path).body(Body::empty()).expect("request"),
+        Request::builder()
+            .method("DELETE")
+            .uri(&path)
+            .body(Body::empty())
+            .expect("request"),
         signed(&fixture, "DELETE", &path, &[]),
     );
     let response = send(&fixture.app, request).await;
@@ -355,7 +396,10 @@ async fn ephemeral_flow_and_abuse() {
     let response = send(&fixture.app, get(&path)).await;
     assert_eq!(response.status(), StatusCode::GONE);
     assert_eq!(
-        response.headers().get("x-volta-error-code").map(|v| v.to_str().unwrap_or("")),
+        response
+            .headers()
+            .get("x-volta-error-code")
+            .map(|v| v.to_str().unwrap_or("")),
         Some("E_KEY_REVOKED")
     );
 }
@@ -389,10 +433,17 @@ async fn ephemeral_expiry_is_terminal() {
     )
     .expect("backdate");
     drop(conn);
-    let response = send(&fixture.app, get(&format!("/api/v1/ephemeral-keys/{key_id}"))).await;
+    let response = send(
+        &fixture.app,
+        get(&format!("/api/v1/ephemeral-keys/{key_id}")),
+    )
+    .await;
     assert_eq!(response.status(), StatusCode::GONE);
     assert_eq!(
-        response.headers().get("x-volta-error-code").map(|v| v.to_str().unwrap_or("")),
+        response
+            .headers()
+            .get("x-volta-error-code")
+            .map(|v| v.to_str().unwrap_or("")),
         Some("E_KEY_EXPIRED")
     );
 }
@@ -440,7 +491,9 @@ async fn mcp_tools_and_auth() {
     let response = send(&fixture.app, post_json("/mcp", &call)).await;
     let result = json_body(response).await;
     assert_eq!(result["result"]["isError"], json!(true));
-    let text = result["result"]["content"][0]["text"].as_str().expect("text");
+    let text = result["result"]["content"][0]["text"]
+        .as_str()
+        .expect("text");
     assert!(text.contains("E_AUTH_REQUIRED"), "{text}");
 
     // No decapsulation tool exists (MCP-5).
@@ -459,16 +512,23 @@ async fn a2a_card_and_tasks() {
 
     // Verify the card signature against the identity key (A2A-3).
     let signature_entry = &card["signatures"][0];
-    let protected = signature_entry["protected"].as_str().expect("protected").to_string();
+    let protected = signature_entry["protected"]
+        .as_str()
+        .expect("protected")
+        .to_string();
     let signature = base64::engine::general_purpose::URL_SAFE_NO_PAD
         .decode(signature_entry["signature"].as_str().expect("signature"))
         .expect("b64");
     let mut unsigned = card.clone();
-    unsigned.as_object_mut().expect("object").remove("signatures");
+    unsigned
+        .as_object_mut()
+        .expect("object")
+        .remove("signatures");
     let canonical = volta_server::jcs::canonicalize(&unsigned);
     let payload = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(canonical.as_bytes());
     let input = format!("{protected}.{payload}");
-    let identity = IdentitySigner::from_seed(IdentitySuite::EddsaEd25519, &[3u8; 32]).expect("identity");
+    let identity =
+        IdentitySigner::from_seed(IdentitySuite::EddsaEd25519, &[3u8; 32]).expect("identity");
     volta_crypto::signing::verify(
         IdentitySuite::EddsaEd25519,
         &identity.verifying_key_bytes(),
@@ -491,7 +551,8 @@ async fn a2a_card_and_tasks() {
     let task_id = task["result"]["id"].as_str().expect("task id").to_string();
 
     // Another principal cannot see the task (no existence oracle).
-    let get_body = json!({"id": 2, "jsonrpc": "2.0", "method": "tasks/get", "params": {"id": task_id}});
+    let get_body =
+        json!({"id": 2, "jsonrpc": "2.0", "method": "tasks/get", "params": {"id": task_id}});
     let request = with_headers(
         post_json("/a2a/v1", &get_body),
         signed(&fixture, "POST", "/a2a/v1", get_body.to_string().as_bytes()),

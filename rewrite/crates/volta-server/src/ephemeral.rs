@@ -10,19 +10,21 @@
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 
+use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::HeaderMap;
 use axum::response::{IntoResponse, Response};
-use axum::Json;
-use rusqlite::{params, Connection};
+use rusqlite::{Connection, params};
 use serde::Deserialize;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use uuid::Uuid;
 use volta_core::error::VoltaError;
-use volta_crypto::suites::{decapsulate, generate_keypair, Suite};
+use volta_crypto::suites::{Suite, decapsulate, generate_keypair};
 use zeroize::Zeroizing;
 
-use crate::auth::{authenticate, authenticate_with_body, require_authenticated, require_step_up, Caller};
+use crate::auth::{
+    Caller, authenticate, authenticate_with_body, require_authenticated, require_step_up,
+};
 use crate::http_util::{b64_decode, b64_encode, problem, rfc3339, sha256_hex, unix_now};
 use crate::state::AppState;
 
@@ -36,7 +38,12 @@ pub const TTL_MIN_SECONDS: u64 = 30;
 pub const SESSION_MAX_SECONDS: u64 = 600;
 
 /// Allowed purposes (SPEC 7.3, alphabetical).
-pub const PURPOSES: [&str; 4] = ["a2a-session", "mcp-session", "relay-session", "wireguard-psk"];
+pub const PURPOSES: [&str; 4] = [
+    "a2a-session",
+    "mcp-session",
+    "relay-session",
+    "wireguard-psk",
+];
 
 /// One ephemeral key's durable metadata.
 #[derive(Clone, Debug)]
@@ -129,20 +136,39 @@ impl EphemeralStore {
     ///
     /// # Errors
     /// `E_CONFIG_INVALID` on storage failure.
-    pub fn insert_key(&self, record: &EphKeyRecord, private: Option<Vec<u8>>) -> Result<(), VoltaError> {
-        let conn = self.conn.lock().map_err(|_| VoltaError::ConfigInvalid("lock".into()))?;
+    pub fn insert_key(
+        &self,
+        record: &EphKeyRecord,
+        private: Option<Vec<u8>>,
+    ) -> Result<(), VoltaError> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|_| VoltaError::ConfigInvalid("lock".into()))?;
         conn.execute(
             "INSERT INTO eph_keys VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13)",
             params![
-                record.key_id, record.owner_id, record.purpose, record.audience,
-                record.suite, record.custody, record.status, record.created_unix as i64,
-                record.expires_unix as i64, record.rotation_due_unix as i64,
-                record.classical_public, record.kem_public, record.supersedes
+                record.key_id,
+                record.owner_id,
+                record.purpose,
+                record.audience,
+                record.suite,
+                record.custody,
+                record.status,
+                record.created_unix as i64,
+                record.expires_unix as i64,
+                record.rotation_due_unix as i64,
+                record.classical_public,
+                record.kem_public,
+                record.supersedes
             ],
         )
         .map_err(|e| VoltaError::ConfigInvalid(e.to_string()))?;
         if let Some(material) = private {
-            let mut map = self.private.lock().map_err(|_| VoltaError::ConfigInvalid("lock".into()))?;
+            let mut map = self
+                .private
+                .lock()
+                .map_err(|_| VoltaError::ConfigInvalid("lock".into()))?;
             map.insert(record.key_id.clone(), Zeroizing::new(material));
         }
         Ok(())
@@ -166,17 +192,22 @@ impl EphemeralStore {
     }
 
     fn raw_key(&self, key_id: &str) -> Result<Option<EphKeyRecord>, VoltaError> {
-        let conn = self.conn.lock().map_err(|_| VoltaError::ConfigInvalid("lock".into()))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|_| VoltaError::ConfigInvalid("lock".into()))?;
         let mut stmt = conn
             .prepare("SELECT key_id, owner_id, purpose, audience, suite, custody, status, created_unix, expires_unix, rotation_due_unix, classical_public, kem_public, supersedes FROM eph_keys WHERE key_id = ?1")
             .map_err(|e| VoltaError::ConfigInvalid(e.to_string()))?;
-        let rows = stmt
+        let mut rows = stmt
             .query_map(params![key_id], row_to_record)
             .map_err(|e| VoltaError::ConfigInvalid(e.to_string()))?;
-        for row in rows {
-            return Ok(Some(row.map_err(|e| VoltaError::ConfigInvalid(e.to_string()))?));
+        match rows.next() {
+            Some(row) => Ok(Some(
+                row.map_err(|e| VoltaError::ConfigInvalid(e.to_string()))?,
+            )),
+            None => Ok(None),
         }
-        Ok(None)
     }
 
     /// List an owner's keys after `cursor`, newest last.
@@ -190,12 +221,18 @@ impl EphemeralStore {
         limit: usize,
         cursor: Option<&str>,
     ) -> Result<Vec<EphKeyRecord>, VoltaError> {
-        let conn = self.conn.lock().map_err(|_| VoltaError::ConfigInvalid("lock".into()))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|_| VoltaError::ConfigInvalid("lock".into()))?;
         let mut stmt = conn
             .prepare("SELECT key_id, owner_id, purpose, audience, suite, custody, status, created_unix, expires_unix, rotation_due_unix, classical_public, kem_public, supersedes FROM eph_keys WHERE owner_id = ?1 AND key_id > ?2 ORDER BY key_id ASC LIMIT ?3")
             .map_err(|e| VoltaError::ConfigInvalid(e.to_string()))?;
         let rows = stmt
-            .query_map(params![owner_id, cursor.unwrap_or(""), limit as i64], row_to_record)
+            .query_map(
+                params![owner_id, cursor.unwrap_or(""), limit as i64],
+                row_to_record,
+            )
             .map_err(|e| VoltaError::ConfigInvalid(e.to_string()))?;
         let mut out = Vec::new();
         for row in rows {
@@ -214,7 +251,10 @@ impl EphemeralStore {
     /// `E_CONFIG_INVALID` on storage failure.
     pub fn set_status(&self, key_id: &str, status: &str) -> Result<(), VoltaError> {
         {
-            let conn = self.conn.lock().map_err(|_| VoltaError::ConfigInvalid("lock".into()))?;
+            let conn = self
+                .conn
+                .lock()
+                .map_err(|_| VoltaError::ConfigInvalid("lock".into()))?;
             conn.execute(
                 "UPDATE eph_keys SET status = ?2 WHERE key_id = ?1",
                 params![key_id, status],
@@ -222,7 +262,10 @@ impl EphemeralStore {
             .map_err(|e| VoltaError::ConfigInvalid(e.to_string()))?;
         }
         if status == "expired" || status == "revoked" {
-            let mut map = self.private.lock().map_err(|_| VoltaError::ConfigInvalid("lock".into()))?;
+            let mut map = self
+                .private
+                .lock()
+                .map_err(|_| VoltaError::ConfigInvalid("lock".into()))?;
             map.remove(key_id);
         }
         Ok(())
@@ -231,14 +274,21 @@ impl EphemeralStore {
     /// Whether server-custody private material is present.
     #[must_use]
     pub fn has_private(&self, key_id: &str) -> bool {
-        self.private.lock().map(|map| map.contains_key(key_id)).unwrap_or(false)
+        self.private
+            .lock()
+            .map(|map| map.contains_key(key_id))
+            .unwrap_or(false)
     }
 
     /// Clone the private material for a decapsulation (the clone is
     /// zeroizing at the call site and never stored, EPH-5).
     #[must_use]
     pub fn private_material(&self, key_id: &str) -> Option<Vec<u8>> {
-        self.private.lock().ok()?.get(key_id).map(|z| z.as_slice().to_vec())
+        self.private
+            .lock()
+            .ok()?
+            .get(key_id)
+            .map(|z| z.as_slice().to_vec())
     }
 
     /// Register a session.
@@ -246,7 +296,10 @@ impl EphemeralStore {
     /// # Errors
     /// `E_CONFIG_INVALID` on lock failure.
     pub fn add_session(&self, session: SessionRecord) -> Result<(), VoltaError> {
-        let mut map = self.sessions.lock().map_err(|_| VoltaError::ConfigInvalid("lock".into()))?;
+        let mut map = self
+            .sessions
+            .lock()
+            .map_err(|_| VoltaError::ConfigInvalid("lock".into()))?;
         map.insert(session.session_id.clone(), session);
         Ok(())
     }
@@ -288,24 +341,39 @@ pub fn key_record_json(record: &EphKeyRecord, custody_lost: bool, include_public
             "classical_public_b64".to_string(),
             json!(b64_encode(&record.classical_public)),
         );
-        public_material.insert("kem_public_b64".to_string(), json!(b64_encode(&record.kem_public)));
+        public_material.insert(
+            "kem_public_b64".to_string(),
+            json!(b64_encode(&record.kem_public)),
+        );
         public_material.insert("suite".to_string(), json!(record.suite));
     }
     let mut out = serde_json::Map::new();
     out.insert("audience".to_string(), json!(record.audience));
-    out.insert("created_at".to_string(), json!(rfc3339(record.created_unix)));
+    out.insert(
+        "created_at".to_string(),
+        json!(rfc3339(record.created_unix)),
+    );
     if custody_lost {
         out.insert("custody_lost".to_string(), json!(true));
     }
     out.insert("custody".to_string(), json!(record.custody));
-    out.insert("expires_at".to_string(), json!(rfc3339(record.expires_unix)));
+    out.insert(
+        "expires_at".to_string(),
+        json!(rfc3339(record.expires_unix)),
+    );
     out.insert("key_id".to_string(), json!(record.key_id));
     out.insert("owner_id".to_string(), json!(record.owner_id));
     if include_public {
-        out.insert("public_material".to_string(), Value::Object(public_material));
+        out.insert(
+            "public_material".to_string(),
+            Value::Object(public_material),
+        );
     }
     out.insert("purpose".to_string(), json!(record.purpose));
-    out.insert("rotation_due_at".to_string(), json!(rfc3339(record.rotation_due_unix)));
+    out.insert(
+        "rotation_due_at".to_string(),
+        json!(rfc3339(record.rotation_due_unix)),
+    );
     out.insert("status".to_string(), json!(record.status));
     if let Some(supersedes) = &record.supersedes {
         out.insert("supersedes".to_string(), json!(supersedes));
@@ -364,7 +432,9 @@ pub fn issue_key(
     }
     let rotation = body.rotation_interval_seconds.unwrap_or(ttl);
     if !(TTL_MIN_SECONDS..=ttl).contains(&rotation) {
-        return Err(VoltaError::Validation("rotation_interval_seconds".to_string()));
+        return Err(VoltaError::Validation(
+            "rotation_interval_seconds".to_string(),
+        ));
     }
     let custody = body.custody.as_deref().unwrap_or("local");
     let now = unix_now();
@@ -376,14 +446,18 @@ pub fn issue_key(
                 .ok_or_else(|| VoltaError::Validation("public_material".to_string()))?;
             let kem_public = b64_decode(&material.kem_public_b64)?;
             if kem_public.len() != suite.kem_public_len() {
-                return Err(VoltaError::CryptoNotAllowed("kem public length".to_string()));
+                return Err(VoltaError::CryptoNotAllowed(
+                    "kem public length".to_string(),
+                ));
             }
             let classical_public = match &material.classical_public_b64 {
                 Some(text) => b64_decode(text)?,
                 None => Vec::new(),
             };
             if classical_public.len() != suite.classical_len() {
-                return Err(VoltaError::CryptoNotAllowed("classical public length".to_string()));
+                return Err(VoltaError::CryptoNotAllowed(
+                    "classical public length".to_string(),
+                ));
             }
             (classical_public, kem_public, None)
         }
@@ -446,7 +520,9 @@ pub async fn issue(
     }
     let parsed: IssueBody = match serde_json::from_slice(&body) {
         Ok(parsed) => parsed,
-        Err(_) => return problem(VoltaError::Validation("body".into()), &request_id).into_response(),
+        Err(_) => {
+            return problem(VoltaError::Validation("body".into()), &request_id).into_response();
+        }
     };
     if let Caller::Principal { name, .. } = &caller {
         if parsed.owner_id != *name {
@@ -460,17 +536,18 @@ pub async fn issue(
     match issue_key(&state, &parsed.owner_id, &parsed, None) {
         Ok(record) => {
             let lost = record.custody == "server" && !state.ephemeral.has_private(&record.key_id);
-            (axum::http::StatusCode::CREATED, Json(key_record_json(&record, lost, true))).into_response()
+            (
+                axum::http::StatusCode::CREATED,
+                Json(key_record_json(&record, lost, true)),
+            )
+                .into_response()
         }
         Err(error) => problem(error, &request_id).into_response(),
     }
 }
 
 /// GET /api/v1/ephemeral-keys/<key_id> — public material + metadata.
-pub async fn get_one(
-    State(state): State<Arc<AppState>>,
-    Path(key_id): Path<String>,
-) -> Response {
+pub async fn get_one(State(state): State<Arc<AppState>>, Path(key_id): Path<String>) -> Response {
     let request_id = new_request_id();
     if let Err(error) = state.rate_check("by-keyid", &key_id) {
         return problem(error, &request_id).into_response();
@@ -528,10 +605,12 @@ pub async fn list(
         return problem(VoltaError::AuthRequired, &request_id).into_response();
     }
     let limit = query.limit.unwrap_or(50).min(200);
-    match state
-        .ephemeral
-        .list_keys(&query.owner_id, query.status.as_deref(), limit, query.cursor.as_deref())
-    {
+    match state.ephemeral.list_keys(
+        &query.owner_id,
+        query.status.as_deref(),
+        limit,
+        query.cursor.as_deref(),
+    ) {
         Ok(records) => {
             let keys: Vec<Value> = records
                 .iter()
@@ -603,10 +682,11 @@ pub async fn rotate(
             return Err(status_error(&record));
         }
         let parsed: RotateBody = if body.is_empty() {
-            RotateBody { public_material: None }
+            RotateBody {
+                public_material: None,
+            }
         } else {
-            serde_json::from_slice(&body)
-                .map_err(|_| VoltaError::Validation("body".to_string()))?
+            serde_json::from_slice(&body).map_err(|_| VoltaError::Validation("body".to_string()))?
         };
         let ttl = record.expires_unix - record.created_unix;
         let issue = IssueBody {
@@ -621,7 +701,10 @@ pub async fn rotate(
         };
         let successor = issue_key(&state, &record.owner_id, &issue, Some(key_id.clone()))?;
         state.ephemeral.set_status(&key_id, "superseded")?;
-        Ok((axum::http::StatusCode::CREATED, key_record_json(&successor, false, true)))
+        Ok((
+            axum::http::StatusCode::CREATED,
+            key_record_json(&successor, false, true),
+        ))
     })();
     match result {
         Ok((status, value)) => (status, Json(value)).into_response(),

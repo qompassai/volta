@@ -11,13 +11,13 @@
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 
+use axum::Json;
 use axum::extract::State;
 use axum::http::HeaderMap;
 use axum::response::{IntoResponse, Response};
-use axum::Json;
-use rusqlite::{params, Connection};
+use rusqlite::{Connection, params};
 use serde::Deserialize;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use url::Url;
 use uuid::Uuid;
 use volta_core::config::ServerConfig;
@@ -105,7 +105,10 @@ impl OperatorStore {
     /// # Errors
     /// `E_CONFIG_INVALID` on storage failure.
     pub fn set_bootstrap_hash(&self, token_hash: &str) -> Result<(), VoltaError> {
-        let conn = self.conn.lock().map_err(|_| VoltaError::ConfigInvalid("lock".into()))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|_| VoltaError::ConfigInvalid("lock".into()))?;
         conn.execute(
             "INSERT OR REPLACE INTO bootstrap_tokens (token_hash) VALUES (?1)",
             params![token_hash],
@@ -155,7 +158,10 @@ impl OperatorStore {
     /// # Errors
     /// `E_CONFIG_INVALID` on storage failure.
     pub fn clear_bootstrap(&self) -> Result<(), VoltaError> {
-        let conn = self.conn.lock().map_err(|_| VoltaError::ConfigInvalid("lock".into()))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|_| VoltaError::ConfigInvalid("lock".into()))?;
         conn.execute("DELETE FROM bootstrap_tokens", [])
             .map_err(|e| VoltaError::ConfigInvalid(e.to_string()))?;
         Ok(())
@@ -195,10 +201,13 @@ impl OperatorStore {
         passkey: &Passkey,
     ) -> Result<String, VoltaError> {
         let cred_id = credential_id_string(passkey);
-        let passkey_json = serde_json::to_string(passkey)
-            .map_err(|e| VoltaError::ConfigInvalid(e.to_string()))?;
+        let passkey_json =
+            serde_json::to_string(passkey).map_err(|e| VoltaError::ConfigInvalid(e.to_string()))?;
         let counter = counter_of_json(&passkey_json);
-        let conn = self.conn.lock().map_err(|_| VoltaError::ConfigInvalid("lock".into()))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|_| VoltaError::ConfigInvalid("lock".into()))?;
         if let Some(existing) = self.operator_of_cred(&conn, &cred_id) {
             if existing != operator_id {
                 return Err(VoltaError::Forbidden(
@@ -230,9 +239,14 @@ impl OperatorStore {
     /// # Errors
     /// `E_CONFIG_INVALID` on storage failure.
     pub fn passkeys_of(&self, operator_id: &str) -> Result<Vec<Passkey>, VoltaError> {
-        let conn = self.conn.lock().map_err(|_| VoltaError::ConfigInvalid("lock".into()))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|_| VoltaError::ConfigInvalid("lock".into()))?;
         let mut stmt = conn
-            .prepare("SELECT passkey_json FROM wa_credentials WHERE operator_id = ?1 AND locked = 0")
+            .prepare(
+                "SELECT passkey_json FROM wa_credentials WHERE operator_id = ?1 AND locked = 0",
+            )
             .map_err(|e| VoltaError::ConfigInvalid(e.to_string()))?;
         let rows = stmt
             .query_map(params![operator_id], |row| row.get::<_, String>(0))
@@ -252,7 +266,10 @@ impl OperatorStore {
     /// # Errors
     /// `E_CONFIG_INVALID` on storage failure.
     pub fn all_passkeys(&self) -> Result<Vec<Passkey>, VoltaError> {
-        let conn = self.conn.lock().map_err(|_| VoltaError::ConfigInvalid("lock".into()))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|_| VoltaError::ConfigInvalid("lock".into()))?;
         let mut stmt = conn
             .prepare("SELECT passkey_json FROM wa_credentials WHERE locked = 0")
             .map_err(|e| VoltaError::ConfigInvalid(e.to_string()))?;
@@ -279,7 +296,10 @@ impl OperatorStore {
         &self,
         cred_id: &str,
     ) -> Result<Option<(String, Passkey, u32, bool)>, VoltaError> {
-        let conn = self.conn.lock().map_err(|_| VoltaError::ConfigInvalid("lock".into()))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|_| VoltaError::ConfigInvalid("lock".into()))?;
         let row = conn
             .query_row(
                 "SELECT operator_id, passkey_json, counter, locked FROM wa_credentials WHERE cred_id = ?1",
@@ -310,9 +330,12 @@ impl OperatorStore {
     /// `E_CONFIG_INVALID` on storage failure.
     pub fn update_passkey(&self, passkey: &Passkey, counter: u32) -> Result<(), VoltaError> {
         let cred_id = credential_id_string(passkey);
-        let passkey_json = serde_json::to_string(passkey)
-            .map_err(|e| VoltaError::ConfigInvalid(e.to_string()))?;
-        let conn = self.conn.lock().map_err(|_| VoltaError::ConfigInvalid("lock".into()))?;
+        let passkey_json =
+            serde_json::to_string(passkey).map_err(|e| VoltaError::ConfigInvalid(e.to_string()))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|_| VoltaError::ConfigInvalid("lock".into()))?;
         conn.execute(
             "UPDATE wa_credentials SET passkey_json = ?2, counter = ?3 WHERE cred_id = ?1",
             params![cred_id, passkey_json, counter as i64],
@@ -326,7 +349,10 @@ impl OperatorStore {
     /// # Errors
     /// `E_CONFIG_INVALID` on storage failure.
     pub fn lock_credential(&self, cred_id: &str) -> Result<(), VoltaError> {
-        let conn = self.conn.lock().map_err(|_| VoltaError::ConfigInvalid("lock".into()))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|_| VoltaError::ConfigInvalid("lock".into()))?;
         conn.execute(
             "UPDATE wa_credentials SET locked = 1 WHERE cred_id = ?1",
             params![cred_id],
@@ -349,7 +375,10 @@ impl OperatorStore {
         let mut bytes = [0u8; 16];
         rand::RngCore::fill_bytes(&mut rand::rngs::OsRng, &mut bytes);
         let id = format!("chg_{}", b64u_encode(&bytes));
-        let mut map = self.challenges.lock().map_err(|_| VoltaError::ConfigInvalid("lock".into()))?;
+        let mut map = self
+            .challenges
+            .lock()
+            .map_err(|_| VoltaError::ConfigInvalid("lock".into()))?;
         map.insert(
             id.clone(),
             ChallengeRecord {
@@ -368,7 +397,11 @@ impl OperatorStore {
     /// # Errors
     /// `E_WEBAUTHN_CHALLENGE_INVALID` when unknown, expired, or
     /// of the wrong kind.
-    pub fn challenge_take(&self, id: &str, kind: &str) -> Result<(String, String, Option<String>), VoltaError> {
+    pub fn challenge_take(
+        &self,
+        id: &str,
+        kind: &str,
+    ) -> Result<(String, String, Option<String>), VoltaError> {
         let mut map = self
             .challenges
             .lock()
@@ -389,7 +422,10 @@ impl OperatorStore {
         rand::RngCore::fill_bytes(&mut rand::rngs::OsRng, &mut bytes);
         let token = b64u_encode(&bytes);
         let now = unix_now();
-        let mut map = self.sessions.lock().map_err(|_| VoltaError::ConfigInvalid("lock".into()))?;
+        let mut map = self
+            .sessions
+            .lock()
+            .map_err(|_| VoltaError::ConfigInvalid("lock".into()))?;
         map.insert(
             token.clone(),
             SessionRecord {
@@ -468,7 +504,8 @@ pub async fn register_options(
         .unwrap_or("");
     let authorized = crate::auth::operator_session(&state, &headers).is_some()
         || (!state.operator.any_credentials()
-            && ((!state.bootstrap_token.is_empty() && presented_bootstrap == state.bootstrap_token)
+            && ((!state.bootstrap_token.is_empty()
+                && presented_bootstrap == state.bootstrap_token)
                 || state.operator.bootstrap_matches(presented_bootstrap)));
     if !authorized {
         return problem(VoltaError::AuthRequired, &request_id).into_response();
@@ -476,27 +513,31 @@ pub async fn register_options(
     let parsed: RegisterOptionsBody = match serde_json::from_slice(&body) {
         Ok(parsed) => parsed,
         Err(_) => {
-            return problem(VoltaError::Validation("body".into()), &request_id).into_response()
+            return problem(VoltaError::Validation("body".into()), &request_id).into_response();
         }
     };
     let result = (|| -> Result<Value, VoltaError> {
         let existing = state.operator.passkeys_of(&parsed.operator_id)?;
-        let exclude: Vec<webauthn_rs::prelude::CredentialID> =
-            existing.iter().map(|passkey| passkey.cred_id().clone()).collect();
-        let (options, registration) = state.operator.engine().start_passkey_registration(
-            operator_handle(&parsed.operator_id),
-            &parsed.operator_id,
-            &parsed.operator_id,
-            Some(exclude),
-        ).map_err(|error| VoltaError::WebauthnAssertionInvalid(error.to_string()))?;
+        let exclude: Vec<webauthn_rs::prelude::CredentialID> = existing
+            .iter()
+            .map(|passkey| passkey.cred_id().clone())
+            .collect();
+        let (options, registration) = state
+            .operator
+            .engine()
+            .start_passkey_registration(
+                operator_handle(&parsed.operator_id),
+                &parsed.operator_id,
+                &parsed.operator_id,
+                Some(exclude),
+            )
+            .map_err(|error| VoltaError::WebauthnAssertionInvalid(error.to_string()))?;
         let state_json = serde_json::to_string(&registration)
             .map_err(|error| VoltaError::ConfigInvalid(error.to_string()))?;
-        let challenge_id = state.operator.challenge_put(
-            "register",
-            &parsed.operator_id,
-            state_json,
-            None,
-        )?;
+        let challenge_id =
+            state
+                .operator
+                .challenge_put("register", &parsed.operator_id, state_json, None)?;
         Ok(json!({"challenge_id": challenge_id, "options": options}))
     })();
     match result {
@@ -525,21 +566,27 @@ pub async fn register_verify(
     let parsed: RegisterVerifyBody = match serde_json::from_slice(&body) {
         Ok(parsed) => parsed,
         Err(_) => {
-            return problem(VoltaError::Validation("body".into()), &request_id).into_response()
+            return problem(VoltaError::Validation("body".into()), &request_id).into_response();
         }
     };
     let result = (|| -> Result<(axum::http::StatusCode, Value), VoltaError> {
-        let (operator_id, state_json, _) =
-            state.operator.challenge_take(&parsed.challenge_id, "register")?;
-        let registration: PasskeyRegistration = serde_json::from_str(&state_json)
-            .map_err(|_| VoltaError::WebauthnChallengeInvalid)?;
+        let (operator_id, state_json, _) = state
+            .operator
+            .challenge_take(&parsed.challenge_id, "register")?;
+        let registration: PasskeyRegistration =
+            serde_json::from_str(&state_json).map_err(|_| VoltaError::WebauthnChallengeInvalid)?;
         let passkey = state
             .operator
             .engine()
             .finish_passkey_registration(&parsed.credential, &registration)
             .map_err(|error| VoltaError::WebauthnAssertionInvalid(error.to_string()))?;
-        let nickname = parsed.nickname.clone().unwrap_or_else(|| "passkey".to_string());
-        let cred_id = state.operator.store_passkey(&operator_id, &nickname, &passkey)?;
+        let nickname = parsed
+            .nickname
+            .clone()
+            .unwrap_or_else(|| "passkey".to_string());
+        let cred_id = state
+            .operator
+            .store_passkey(&operator_id, &nickname, &passkey)?;
         Ok((
             axum::http::StatusCode::CREATED,
             json!({"credential_id": cred_id, "nickname": nickname}),
@@ -561,18 +608,18 @@ pub struct AuthOptionsBody {
 }
 
 /// POST /api/v1/operator/webauthn/auth/options.
-pub async fn auth_options(
-    State(state): State<Arc<AppState>>,
-    body: axum::body::Bytes,
-) -> Response {
+pub async fn auth_options(State(state): State<Arc<AppState>>, body: axum::body::Bytes) -> Response {
     let request_id = crate::ephemeral::new_request_id();
     let parsed: AuthOptionsBody = if body.is_empty() {
-        AuthOptionsBody { operator_id: None, step_up_for: None }
+        AuthOptionsBody {
+            operator_id: None,
+            step_up_for: None,
+        }
     } else {
         match serde_json::from_slice(&body) {
             Ok(parsed) => parsed,
             Err(_) => {
-                return problem(VoltaError::Validation("body".into()), &request_id).into_response()
+                return problem(VoltaError::Validation("body".into()), &request_id).into_response();
             }
         }
     };
@@ -617,21 +664,20 @@ pub struct AuthVerifyBody {
 }
 
 /// POST /api/v1/operator/webauthn/auth/verify.
-pub async fn auth_verify(
-    State(state): State<Arc<AppState>>,
-    body: axum::body::Bytes,
-) -> Response {
+pub async fn auth_verify(State(state): State<Arc<AppState>>, body: axum::body::Bytes) -> Response {
     let request_id = crate::ephemeral::new_request_id();
     let parsed: AuthVerifyBody = match serde_json::from_slice(&body) {
         Ok(parsed) => parsed,
         Err(_) => {
-            return problem(VoltaError::Validation("body".into()), &request_id).into_response()
+            return problem(VoltaError::Validation("body".into()), &request_id).into_response();
         }
     };
     let result = (|| -> Result<(Value, String), VoltaError> {
-        let (_, state_json, _) = state.operator.challenge_take(&parsed.challenge_id, "auth")?;
-        let authentication: PasskeyAuthentication = serde_json::from_str(&state_json)
-            .map_err(|_| VoltaError::WebauthnChallengeInvalid)?;
+        let (_, state_json, _) = state
+            .operator
+            .challenge_take(&parsed.challenge_id, "auth")?;
+        let authentication: PasskeyAuthentication =
+            serde_json::from_str(&state_json).map_err(|_| VoltaError::WebauthnChallengeInvalid)?;
         let result = state
             .operator
             .engine()
@@ -685,7 +731,9 @@ pub async fn auth_verify(
 pub async fn whoami(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
     let request_id = crate::ephemeral::new_request_id();
     match crate::auth::operator_session(&state, &headers) {
-        Some(operator_id) => Json(json!({"operator_id": operator_id, "role": "operator"})).into_response(),
+        Some(operator_id) => {
+            Json(json!({"operator_id": operator_id, "role": "operator"})).into_response()
+        }
         None => problem(VoltaError::AuthRequired, &request_id).into_response(),
     }
 }

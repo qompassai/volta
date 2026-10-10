@@ -26,7 +26,12 @@ pub const POLICY_BODY: &str = "mailbox-only\nprotocol-version: 1\n";
 /// GET /.well-known/openpgpkey/<domain>/policy and the direct
 /// /.well-known/openpgpkey/policy.
 pub async fn policy() -> Response {
-    (StatusCode::OK, [("content-type", "text/plain")], POLICY_BODY).into_response()
+    (
+        StatusCode::OK,
+        [("content-type", "text/plain")],
+        POLICY_BODY,
+    )
+        .into_response()
 }
 
 /// GET /.well-known/openpgpkey/<domain>/hu/<hash>?l=<local> and

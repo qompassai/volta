@@ -120,7 +120,10 @@ impl HopType {
     /// Whether this hop resolves target names remotely.
     #[must_use]
     pub fn resolves_remotely(&self) -> bool {
-        matches!(self, Self::Socks5h | Self::TorSocks | Self::VoltaRelay | Self::HttpConnect)
+        matches!(
+            self,
+            Self::Socks5h | Self::TorSocks | Self::VoltaRelay | Self::HttpConnect
+        )
     }
 }
 
@@ -324,9 +327,8 @@ pub fn resolve_secret_ref(reference: &str) -> VoltaResult<Vec<u8>> {
         })?;
         Ok(value.into_bytes())
     } else if let Some(path) = reference.strip_prefix("file:") {
-        let mut bytes = std::fs::read(path).map_err(|e| {
-            VoltaError::ConfigInvalid(format!("secret reference file:{path}: {e}"))
-        })?;
+        let mut bytes = std::fs::read(path)
+            .map_err(|e| VoltaError::ConfigInvalid(format!("secret reference file:{path}: {e}")))?;
         while matches!(bytes.last(), Some(b'\n' | b'\r')) {
             bytes.pop();
         }
@@ -444,8 +446,8 @@ impl ServerConfig {
     pub fn load(path: &std::path::Path) -> VoltaResult<Self> {
         let text = std::fs::read_to_string(path)
             .map_err(|e| VoltaError::ConfigInvalid(format!("{}: {e}", path.display())))?;
-        let config: Self = toml::from_str(&text)
-            .map_err(|e| VoltaError::ConfigInvalid(e.to_string()))?;
+        let config: Self =
+            toml::from_str(&text).map_err(|e| VoltaError::ConfigInvalid(e.to_string()))?;
         config.validate()?;
         Ok(config)
     }

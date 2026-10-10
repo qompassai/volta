@@ -1,0 +1,10 @@
+# #################################################################
+# /qompassai/volta/rewrite/clippy.toml
+# Qompass AI — volta rewrite clippy configuration
+#
+# SPDX-License-Identifier: AGPL-3.0-only OR Apache-2.0
+# Copyright (c) 2026 Qompass AI
+
+msrv = "1.85"
+
+too-many-arguments-threshold = 10

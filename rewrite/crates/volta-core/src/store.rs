@@ -15,7 +15,7 @@
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
-use rusqlite::{params, Connection};
+use rusqlite::{Connection, params};
 use sha2::{Digest, Sha256};
 
 use crate::error::{VoltaError, VoltaResult};
@@ -49,8 +49,7 @@ impl Store {
     /// `E_CONFIG_INVALID` when the layout cannot be created/opened.
     pub fn open(root: &Path) -> VoltaResult<Self> {
         let blob_dir = root.join("blobs");
-        std::fs::create_dir_all(&blob_dir)
-            .map_err(|e| VoltaError::ConfigInvalid(e.to_string()))?;
+        std::fs::create_dir_all(&blob_dir).map_err(|e| VoltaError::ConfigInvalid(e.to_string()))?;
         let conn = Connection::open(root.join("index.sqlite3"))
             .map_err(|e| VoltaError::ConfigInvalid(e.to_string()))?;
         conn.execute_batch(
@@ -177,11 +176,14 @@ impl Store {
         );
         let fingerprint = match fingerprint {
             Ok(f) => f,
-            Err(_) => self.conn.query_row(
-                "SELECT fingerprint FROM subkey_index WHERE key_id = ?1",
-                params![key_id],
-                |row| row.get(0),
-            ).map_err(|_| VoltaError::KeyNotFound)?,
+            Err(_) => self
+                .conn
+                .query_row(
+                    "SELECT fingerprint FROM subkey_index WHERE key_id = ?1",
+                    params![key_id],
+                    |row| row.get(0),
+                )
+                .map_err(|_| VoltaError::KeyNotFound)?,
         };
         self.load(&fingerprint)
     }
@@ -312,8 +314,8 @@ impl Store {
                 uid.verified = verified.contains(email);
             }
         }
-        let meta_json = serde_json::to_string(&meta)
-            .map_err(|e| VoltaError::ConfigInvalid(e.to_string()))?;
+        let meta_json =
+            serde_json::to_string(&meta).map_err(|e| VoltaError::ConfigInvalid(e.to_string()))?;
         let tx = self
             .conn
             .transaction()
@@ -452,7 +454,12 @@ impl Store {
                      fingerprint = excluded.fingerprint,
                      status = excluded.status,
                      verified_at = excluded.verified_at",
-                params![address.to_lowercase(), fingerprint, status.as_str(), verified_at],
+                params![
+                    address.to_lowercase(),
+                    fingerprint,
+                    status.as_str(),
+                    verified_at
+                ],
             )
             .map_err(|e| VoltaError::ConfigInvalid(e.to_string()))?;
         Ok(())
@@ -474,9 +481,7 @@ impl Store {
             {
                 if let Ok(rows) = stmt.query_map([], |row| row.get::<_, String>(0)) {
                     for meta_json in rows.flatten() {
-                        if let Ok(meta) =
-                            serde_json::from_str::<CertificateMeta>(&meta_json)
-                        {
+                        if let Ok(meta) = serde_json::from_str::<CertificateMeta>(&meta_json) {
                             if meta.revoked {
                                 n += 1;
                             }
@@ -488,26 +493,24 @@ impl Store {
         };
         StoreStats {
             certificates: count("SELECT COUNT(*) FROM certificates"),
-            published_addresses: count(
-                "SELECT COUNT(*) FROM bindings WHERE status = 'published'",
-            ),
+            published_addresses: count("SELECT COUNT(*) FROM bindings WHERE status = 'published'"),
             revoked_certificates: revoked,
         }
     }
 
     fn load(&self, fingerprint: &str) -> VoltaResult<StoredCertificate> {
-        let (armor, content_sha256, meta_json, revision): (String, String, String, i64) =
-            self.conn
-                .query_row(
-                    "SELECT armor, content_sha256, meta_json, revision
+        let (armor, content_sha256, meta_json, revision): (String, String, String, i64) = self
+            .conn
+            .query_row(
+                "SELECT armor, content_sha256, meta_json, revision
                      FROM certificates WHERE fingerprint = ?1",
-                    params![fingerprint],
-                    |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
-                )
-                .map_err(|_| VoltaError::KeyNotFound)?;
+                params![fingerprint],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            )
+            .map_err(|_| VoltaError::KeyNotFound)?;
         let blob_path = self.blob_dir.join(&content_sha256);
-        let binary =
-            std::fs::read(&blob_path).map_err(|_| VoltaError::KeyMalformed("missing blob".into()))?;
+        let binary = std::fs::read(&blob_path)
+            .map_err(|_| VoltaError::KeyMalformed("missing blob".into()))?;
         if Self::content_address(&binary) != content_sha256 {
             return Err(VoltaError::KeyMalformed(
                 "blob fails its content address".into(),

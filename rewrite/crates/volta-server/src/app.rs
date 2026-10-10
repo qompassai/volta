@@ -8,23 +8,28 @@
 
 use std::sync::Arc;
 
+use axum::Router;
 use axum::extract::DefaultBodyLimit;
 use axum::routing::{get, post};
-use axum::Router;
 
 use crate::state::AppState;
-use crate::{a2a, ephemeral, hkp, mcp, relay, vks, webauthn, web, wkd_http};
+use crate::{a2a, ephemeral, hkp, mcp, relay, vks, web, webauthn, wkd_http};
 
 /// The full volta router.
-#[must_use]
 pub fn router(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/", get(web::index))
         .route("/.well-known/agent-card.json", get(a2a::agent_card))
         .route("/.well-known/openpgpkey/hu/{hash}", get(wkd_http::hu))
         .route("/.well-known/openpgpkey/policy", get(wkd_http::policy))
-        .route("/.well-known/openpgpkey/{domain}/hu/{hash}", get(wkd_http::hu_advanced))
-        .route("/.well-known/openpgpkey/{domain}/policy", get(wkd_http::policy))
+        .route(
+            "/.well-known/openpgpkey/{domain}/hu/{hash}",
+            get(wkd_http::hu_advanced),
+        )
+        .route(
+            "/.well-known/openpgpkey/{domain}/policy",
+            get(wkd_http::policy),
+        )
         .route("/a2a/v1", post(a2a::rpc))
         .route("/about", get(web::about))
         .route(
@@ -84,7 +89,10 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/upload", get(web::upload_form).post(web::upload_submit))
         .route("/verify/{token}", get(web::verify_page))
         .route("/vks/v1/by-email/{email}", get(vks::by_email))
-        .route("/vks/v1/by-fingerprint/{fingerprint}", get(vks::by_fingerprint))
+        .route(
+            "/vks/v1/by-fingerprint/{fingerprint}",
+            get(vks::by_fingerprint),
+        )
         .route("/vks/v1/by-keyid/{key_id}", get(vks::by_keyid))
         .route("/vks/v1/request-manage", post(vks::request_manage))
         .route("/vks/v1/request-verify", post(vks::request_verify))

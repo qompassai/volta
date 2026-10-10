@@ -9,7 +9,7 @@
 //! the key; `--all` removes the certificate entirely. A
 //! fingerprint or KeyID query implies `--all`.
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use volta_core::error::VoltaError;
 use volta_core::model::BindingStatus;
 use volta_core::pgp_key::{is_fingerprint, is_long_key_id, normalize_hex_id};
@@ -19,7 +19,12 @@ use volta_core::store::Store;
 ///
 /// # Errors
 /// `E_KEY_NOT_FOUND` when the query resolves to nothing.
-pub fn delete(store: &mut Store, query: &str, all: bool, all_bindings: bool) -> Result<Value, VoltaError> {
+pub fn delete(
+    store: &mut Store,
+    query: &str,
+    all: bool,
+    all_bindings: bool,
+) -> Result<Value, VoltaError> {
     let normalized = normalize_hex_id(query);
     if is_fingerprint(&normalized) || is_long_key_id(&normalized) {
         let record = if is_fingerprint(&normalized) {

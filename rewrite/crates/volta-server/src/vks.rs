@@ -10,12 +10,12 @@
 
 use std::sync::Arc;
 
+use axum::Json;
 use axum::extract::{Path, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
-use axum::Json;
 use serde::Deserialize;
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 use volta_core::error::VoltaError;
 use volta_core::model::BindingStatus;
 use volta_core::sealed::TokenPayload;
@@ -74,10 +74,7 @@ pub async fn by_fingerprint(
 }
 
 /// GET /vks/v1/by-keyid/<keyid>.
-pub async fn by_keyid(
-    State(state): State<Arc<AppState>>,
-    Path(key_id): Path<String>,
-) -> Response {
+pub async fn by_keyid(State(state): State<Arc<AppState>>, Path(key_id): Path<String>) -> Response {
     let request_id = crate::ephemeral::new_request_id();
     if let Err(error) = state.rate_check("by-fingerprint", &key_id) {
         return problem(error, &request_id).into_response();
@@ -101,15 +98,12 @@ pub struct UploadBody {
 
 /// POST /vks/v1/upload — store unpublished; returns the manage/
 /// verify token for the certificate's addresses (VKS 6.2.2).
-pub async fn upload(
-    State(state): State<Arc<AppState>>,
-    body: axum::body::Bytes,
-) -> Response {
+pub async fn upload(State(state): State<Arc<AppState>>, body: axum::body::Bytes) -> Response {
     let request_id = crate::ephemeral::new_request_id();
     let parsed: UploadBody = match serde_json::from_slice(&body) {
         Ok(parsed) => parsed,
         Err(_) => {
-            return problem(VoltaError::Validation("keytext".into()), &request_id).into_response()
+            return problem(VoltaError::Validation("keytext".into()), &request_id).into_response();
         }
     };
     let result = (|| -> Result<Value, VoltaError> {
@@ -171,7 +165,7 @@ pub async fn request_verify(
     let parsed: RequestVerifyBody = match serde_json::from_slice(&body) {
         Ok(parsed) => parsed,
         Err(_) => {
-            return problem(VoltaError::Validation("body".into()), &request_id).into_response()
+            return problem(VoltaError::Validation("body".into()), &request_id).into_response();
         }
     };
     let result = (|| -> Result<Value, VoltaError> {
@@ -180,17 +174,25 @@ pub async fn request_verify(
             &parsed.token,
             Some("manage"),
             now,
-            state.config.token_validity_seconds as i64,
+            state.config.token_validity_seconds,
         )?;
         let mut status = Map::new();
         let mut dev_tokens = Map::new();
-        let mut store = state.store.lock().map_err(|_| VoltaError::ConfigInvalid("lock".into()))?;
+        let mut store = state
+            .store
+            .lock()
+            .map_err(|_| VoltaError::ConfigInvalid("lock".into()))?;
         for address in &parsed.addresses {
             let address = address.to_lowercase();
-            if !payload.addresses.iter().any(|a| *a == address) {
+            if !payload.addresses.contains(&address) {
                 return Err(VoltaError::VerificationAddressMismatch);
             }
-            store.set_binding_status(&address, &payload.fingerprint, BindingStatus::Pending, None)?;
+            store.set_binding_status(
+                &address,
+                &payload.fingerprint,
+                BindingStatus::Pending,
+                None,
+            )?;
             let verify_token = state.sealer.seal(&TokenPayload {
                 addresses: vec![address.clone()],
                 created_at: now,
@@ -238,14 +240,17 @@ pub fn publish_from_verify_token(state: &AppState, token: &str) -> Result<String
         token,
         Some("verify"),
         now,
-        state.config.token_validity_seconds as i64,
+        state.config.token_validity_seconds,
     )?;
     let address = payload
         .addresses
         .first()
         .cloned()
         .ok_or(VoltaError::TokenInvalid)?;
-    let mut store = state.store.lock().map_err(|_| VoltaError::ConfigInvalid("lock".into()))?;
+    let mut store = state
+        .store
+        .lock()
+        .map_err(|_| VoltaError::ConfigInvalid("lock".into()))?;
     store.publish_address(&address, &payload.fingerprint, now)?;
     Ok(address)
 }
@@ -261,7 +266,7 @@ pub async fn request_manage(
     let parsed: RequestVerifyBody = match serde_json::from_slice(&body) {
         Ok(parsed) => parsed,
         Err(_) => {
-            return problem(VoltaError::Validation("body".into()), &request_id).into_response()
+            return problem(VoltaError::Validation("body".into()), &request_id).into_response();
         }
     };
     let result = (|| -> Result<Value, VoltaError> {
@@ -270,7 +275,7 @@ pub async fn request_manage(
             &parsed.token,
             Some("manage"),
             now,
-            state.config.token_validity_seconds as i64,
+            state.config.token_validity_seconds,
         )?;
         let token = state.sealer.seal(&TokenPayload {
             addresses: payload.addresses.clone(),

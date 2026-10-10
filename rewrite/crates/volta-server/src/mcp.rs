@@ -10,16 +10,16 @@
 
 use std::sync::Arc;
 
+use axum::Json;
 use axum::extract::State;
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
-use axum::Json;
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 use volta_core::error::VoltaError;
 use volta_crypto::policy::policy_json;
 
-use crate::auth::{authenticate_with_body, Caller};
-use crate::ephemeral::{issue_key, key_record_json, IssueBody, PublicMaterialBody};
+use crate::auth::{Caller, authenticate_with_body};
+use crate::ephemeral::{IssueBody, PublicMaterialBody, issue_key, key_record_json};
 use crate::hkp::lookup_exact;
 use crate::http_util::unix_now;
 use crate::state::AppState;
@@ -36,55 +36,145 @@ struct Tool {
     required: Vec<&'static str>,
 }
 
-fn tool(name: &'static str, auth: &'static str, description: &'static str, properties: Value, required: Vec<&'static str>) -> Tool {
-    Tool { auth, description, name, properties, required }
+fn tool(
+    name: &'static str,
+    auth: &'static str,
+    description: &'static str,
+    properties: Value,
+    required: Vec<&'static str>,
+) -> Tool {
+    Tool {
+        auth,
+        description,
+        name,
+        properties,
+        required,
+    }
 }
 
 /// The 13 tools (SPEC 8.2, alphabetical).
 fn tools() -> Vec<Tool> {
     vec![
-        tool("volta_ephemeral_issue", "agent", "Issue an ephemeral key (SPEC 7.3 POST)", json!({
-            "audience": {"type": "string"}, "custody": {"enum": ["local", "server"], "type": "string"},
-            "owner_id": {"type": "string"}, "public_material": {"type": "object"},
-            "purpose": {"type": "string"}, "suite": {"type": "string"}, "ttl_seconds": {"type": "integer"}
-        }), vec!["purpose", "suite"]),
-        tool("volta_ephemeral_revoke", "owner", "Revoke an ephemeral key", json!({
-            "key_id": {"type": "string"}
-        }), vec!["key_id"]),
-        tool("volta_ephemeral_rotate", "owner", "Rotate an ephemeral key", json!({
-            "key_id": {"type": "string"}, "public_material": {"type": "object"}
-        }), vec!["key_id"]),
-        tool("volta_ephemeral_status", "public", "Fetch public material + metadata for an ephemeral key", json!({
-            "key_id": {"type": "string"}
-        }), vec!["key_id"]),
-        tool("volta_key_delete_request", "agent", "Open a deletion/unpublish request for a certificate", json!({
-            "fingerprint": {"type": "string"}, "scope": {"enum": ["addresses", "bindings", "total"], "type": "string"}
-        }), vec!["fingerprint", "scope"]),
-        tool("volta_key_lookup_by_email", "public", "VKS by-email lookup", json!({
-            "email": {"type": "string"}
-        }), vec!["email"]),
-        tool("volta_key_lookup_by_fingerprint", "public", "VKS by-fingerprint lookup", json!({
-            "fingerprint": {"type": "string"}
-        }), vec!["fingerprint"]),
-        tool("volta_key_lookup_by_keyid", "public", "VKS by-keyid lookup", json!({
-            "keyid": {"type": "string"}
-        }), vec!["keyid"]),
-        tool("volta_key_publish", "public", "VKS upload of a certificate", json!({
-            "keytext": {"type": "string"}
-        }), vec!["keytext"]),
-        tool("volta_key_request_verify", "public", "VKS request-verify for uploaded addresses", json!({
-            "addresses": {"items": {"type": "string"}, "type": "array"},
-            "locale": {"type": "string"}, "token": {"type": "string"}
-        }), vec!["addresses", "token"]),
-        tool("volta_proxy_chain_check", "operator", "Per-hop probe of a named proxy chain", json!({
-            "chain": {"type": "string"}, "target": {"type": "string"}
-        }), vec!["chain"]),
-        tool("volta_relay_fetch_key", "agent", "Fetch a certificate from a relay peer through the configured chain", json!({
-            "fingerprint": {"type": "string"}, "peer": {"type": "string"}
-        }), vec!["fingerprint", "peer"]),
-        tool("volta_wkd_lookup", "public", "WKD lookup for an email address", json!({
-            "email": {"type": "string"}
-        }), vec!["email"]),
+        tool(
+            "volta_ephemeral_issue",
+            "agent",
+            "Issue an ephemeral key (SPEC 7.3 POST)",
+            json!({
+                "audience": {"type": "string"}, "custody": {"enum": ["local", "server"], "type": "string"},
+                "owner_id": {"type": "string"}, "public_material": {"type": "object"},
+                "purpose": {"type": "string"}, "suite": {"type": "string"}, "ttl_seconds": {"type": "integer"}
+            }),
+            vec!["purpose", "suite"],
+        ),
+        tool(
+            "volta_ephemeral_revoke",
+            "owner",
+            "Revoke an ephemeral key",
+            json!({
+                "key_id": {"type": "string"}
+            }),
+            vec!["key_id"],
+        ),
+        tool(
+            "volta_ephemeral_rotate",
+            "owner",
+            "Rotate an ephemeral key",
+            json!({
+                "key_id": {"type": "string"}, "public_material": {"type": "object"}
+            }),
+            vec!["key_id"],
+        ),
+        tool(
+            "volta_ephemeral_status",
+            "public",
+            "Fetch public material + metadata for an ephemeral key",
+            json!({
+                "key_id": {"type": "string"}
+            }),
+            vec!["key_id"],
+        ),
+        tool(
+            "volta_key_delete_request",
+            "agent",
+            "Open a deletion/unpublish request for a certificate",
+            json!({
+                "fingerprint": {"type": "string"}, "scope": {"enum": ["addresses", "bindings", "total"], "type": "string"}
+            }),
+            vec!["fingerprint", "scope"],
+        ),
+        tool(
+            "volta_key_lookup_by_email",
+            "public",
+            "VKS by-email lookup",
+            json!({
+                "email": {"type": "string"}
+            }),
+            vec!["email"],
+        ),
+        tool(
+            "volta_key_lookup_by_fingerprint",
+            "public",
+            "VKS by-fingerprint lookup",
+            json!({
+                "fingerprint": {"type": "string"}
+            }),
+            vec!["fingerprint"],
+        ),
+        tool(
+            "volta_key_lookup_by_keyid",
+            "public",
+            "VKS by-keyid lookup",
+            json!({
+                "keyid": {"type": "string"}
+            }),
+            vec!["keyid"],
+        ),
+        tool(
+            "volta_key_publish",
+            "public",
+            "VKS upload of a certificate",
+            json!({
+                "keytext": {"type": "string"}
+            }),
+            vec!["keytext"],
+        ),
+        tool(
+            "volta_key_request_verify",
+            "public",
+            "VKS request-verify for uploaded addresses",
+            json!({
+                "addresses": {"items": {"type": "string"}, "type": "array"},
+                "locale": {"type": "string"}, "token": {"type": "string"}
+            }),
+            vec!["addresses", "token"],
+        ),
+        tool(
+            "volta_proxy_chain_check",
+            "operator",
+            "Per-hop probe of a named proxy chain",
+            json!({
+                "chain": {"type": "string"}, "target": {"type": "string"}
+            }),
+            vec!["chain"],
+        ),
+        tool(
+            "volta_relay_fetch_key",
+            "agent",
+            "Fetch a certificate from a relay peer through the configured chain",
+            json!({
+                "fingerprint": {"type": "string"}, "peer": {"type": "string"}
+            }),
+            vec!["fingerprint", "peer"],
+        ),
+        tool(
+            "volta_wkd_lookup",
+            "public",
+            "WKD lookup for an email address",
+            json!({
+                "email": {"type": "string"}
+            }),
+            vec!["email"],
+        ),
     ]
 }
 
@@ -159,7 +249,9 @@ pub async fn handle(
                 },
             }))
             .into_response();
-            if let Ok(session) = axum::http::HeaderValue::from_str(&uuid::Uuid::now_v7().to_string()) {
+            if let Ok(session) =
+                axum::http::HeaderValue::from_str(&uuid::Uuid::now_v7().to_string())
+            {
                 response.headers_mut().insert("mcp-session-id", session);
             }
             response
@@ -205,7 +297,11 @@ pub async fn handle(
             }
         }
         "tools/list" => rpc_result(id, tools_list_json()),
-        _ => rpc_error(Some(id), -32601, VoltaError::Validation(format!("method {method}"))),
+        _ => rpc_error(
+            Some(id),
+            -32601,
+            VoltaError::Validation(format!("method {method}")),
+        ),
     }
 }
 
@@ -284,8 +380,14 @@ async fn call_tool(
                 }
             }
             let body = IssueBody {
-                audience: arguments.get("audience").and_then(Value::as_str).map(str::to_string),
-                custody: arguments.get("custody").and_then(Value::as_str).map(str::to_string),
+                audience: arguments
+                    .get("audience")
+                    .and_then(Value::as_str)
+                    .map(str::to_string),
+                custody: arguments
+                    .get("custody")
+                    .and_then(Value::as_str)
+                    .map(str::to_string),
                 owner_id: owner.clone(),
                 public_material: arguments.get("public_material").and_then(|value| {
                     serde_json::from_value::<PublicMaterialBody>(value.clone()).ok()
@@ -300,7 +402,10 @@ async fn call_tool(
         }
         "volta_ephemeral_revoke" => {
             let key_id = string_arg(arguments, "key_id")?;
-            let record = state.ephemeral.get_key(&key_id)?.ok_or(VoltaError::KeyNotFound)?;
+            let record = state
+                .ephemeral
+                .get_key(&key_id)?
+                .ok_or(VoltaError::KeyNotFound)?;
             require_key_owner(caller, &record.owner_id)?;
             if record.status == "active" || record.status == "superseded" {
                 state.ephemeral.set_status(&key_id, "revoked")?;
@@ -309,7 +414,10 @@ async fn call_tool(
         }
         "volta_ephemeral_rotate" => {
             let key_id = string_arg(arguments, "key_id")?;
-            let record = state.ephemeral.get_key(&key_id)?.ok_or(VoltaError::KeyNotFound)?;
+            let record = state
+                .ephemeral
+                .get_key(&key_id)?
+                .ok_or(VoltaError::KeyNotFound)?;
             require_key_owner(caller, &record.owner_id)?;
             if record.status != "active" {
                 return Err(VoltaError::KeyExpired);
@@ -332,7 +440,10 @@ async fn call_tool(
         }
         "volta_ephemeral_status" => {
             let key_id = string_arg(arguments, "key_id")?;
-            let record = state.ephemeral.get_key(&key_id)?.ok_or(VoltaError::KeyNotFound)?;
+            let record = state
+                .ephemeral
+                .get_key(&key_id)?
+                .ok_or(VoltaError::KeyNotFound)?;
             Ok(key_record_json(&record, false, record.status == "active"))
         }
         "volta_key_delete_request" => {
@@ -340,7 +451,10 @@ async fn call_tool(
             let scope = string_arg(arguments, "scope")?;
             let record = lookup_exact(state, &fingerprint, false)?;
             let request_id = format!("del_{}", uuid::Uuid::now_v7());
-            let mut tasks = state.tasks.lock().map_err(|_| VoltaError::ConfigInvalid("lock".into()))?;
+            let mut tasks = state
+                .tasks
+                .lock()
+                .map_err(|_| VoltaError::ConfigInvalid("lock".into()))?;
             tasks.insert(
                 request_id.clone(),
                 crate::state::TaskRecord {
@@ -418,7 +532,10 @@ async fn call_tool(
                 state.config.token_validity_seconds,
             )?;
             let mut status = Map::new();
-            let mut store = state.store.lock().map_err(|_| VoltaError::ConfigInvalid("lock".into()))?;
+            let mut store = state
+                .store
+                .lock()
+                .map_err(|_| VoltaError::ConfigInvalid("lock".into()))?;
             for address in &addresses {
                 if !payload.addresses.iter().any(|a| a == address) {
                     return Err(VoltaError::VerificationAddressMismatch);
@@ -442,8 +559,8 @@ async fn call_tool(
                 },
                 None => ("127.0.0.1".to_string(), 9),
             };
-            let (ok, hops) = volta_proxy::check_chain(&state.config.proxy, &chain, &host, port)
-                .await?;
+            let (ok, hops) =
+                volta_proxy::check_chain(&state.config.proxy, &chain, &host, port).await?;
             Ok(json!({"hops": hops, "ok": ok}))
         }
         "volta_relay_fetch_key" => {
@@ -460,7 +577,10 @@ async fn call_tool(
                 .ok_or_else(|| VoltaError::Validation("email".to_string()))?;
             let hash = volta_core::wkd::wkd_hash(&local);
             let record = {
-                let store = state.store.lock().map_err(|_| VoltaError::ConfigInvalid("lock".into()))?;
+                let store = state
+                    .store
+                    .lock()
+                    .map_err(|_| VoltaError::ConfigInvalid("lock".into()))?;
                 store.get_by_wkd_hash(&hash)?
             };
             Ok(json!({

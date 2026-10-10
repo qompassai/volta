@@ -19,8 +19,7 @@ pub const TLS_VERSION_MIN: &str = "1.3";
 
 /// TLS 1.3 groups in preference order (SPEC 11.2). The first entry
 /// is the hybrid post-quantum group.
-pub const TLS_GROUPS_PREFERENCE: [&str; 4] =
-    ["X25519MLKEM768", "x25519", "secp384r1", "x448"];
+pub const TLS_GROUPS_PREFERENCE: [&str; 4] = ["X25519MLKEM768", "x25519", "secp384r1", "x448"];
 
 /// Whether a WebAuthn COSE algorithm is allowed.
 #[must_use]

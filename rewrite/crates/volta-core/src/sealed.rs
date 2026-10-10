@@ -13,8 +13,8 @@
 
 use aes_gcm::aead::{Aead, KeyInit, Payload};
 use aes_gcm::{Aes256Gcm, Nonce};
-use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use hkdf::Hkdf;
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
@@ -66,10 +66,12 @@ impl TokenSealer {
     /// # Errors
     /// `E_VALIDATION` when the payload exceeds `SEALED_LEN_MAX`.
     pub fn seal(&self, payload: &TokenPayload) -> VoltaResult<String> {
-        let plaintext = serde_json::to_vec(payload)
-            .map_err(|e| VoltaError::Validation(e.to_string()))?;
+        let plaintext =
+            serde_json::to_vec(payload).map_err(|e| VoltaError::Validation(e.to_string()))?;
         if plaintext.len() > SEALED_LEN_MAX {
-            return Err(VoltaError::Validation("token payload too large".to_string()));
+            return Err(VoltaError::Validation(
+                "token payload too large".to_string(),
+            ));
         }
         let mut nonce_bytes = [0u8; NONCE_LEN];
         rand::thread_rng().fill_bytes(&mut nonce_bytes);
@@ -184,7 +186,9 @@ mod tests {
 
     #[test]
     fn wrong_secret_is_invalid() {
-        let token = TokenSealer::new(b"one").seal(&payload(1_000, "verify")).expect("seal");
+        let token = TokenSealer::new(b"one")
+            .seal(&payload(1_000, "verify"))
+            .expect("seal");
         assert!(matches!(
             TokenSealer::new(b"two").unseal_and_check(&token, None, 1_500, 3600),
             Err(VoltaError::TokenInvalid)

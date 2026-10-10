@@ -10,17 +10,17 @@
 
 use std::sync::Arc;
 
+use axum::Json;
 use axum::extract::State;
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
-use axum::Json;
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 use volta_core::error::VoltaError;
 use volta_core::sealed::TokenPayload;
 use volta_crypto::signing::IdentitySuite;
 
-use crate::auth::{authenticate_with_body, Caller};
-use crate::ephemeral::{issue_key, key_record_json, IssueBody, PublicMaterialBody};
+use crate::auth::{Caller, authenticate_with_body};
+use crate::ephemeral::{IssueBody, PublicMaterialBody, issue_key, key_record_json};
 use crate::hkp::lookup_exact;
 use crate::http_util::{b64u_encode, problem, unix_now};
 use crate::jcs::canonicalize;
@@ -114,7 +114,11 @@ pub async fn rpc(
     let request: Value = match serde_json::from_slice(&body) {
         Ok(value) => value,
         Err(_) => {
-            return rpc_error(Value::Null, -32700, VoltaError::Validation("json-rpc body".into()))
+            return rpc_error(
+                Value::Null,
+                -32700,
+                VoltaError::Validation("json-rpc body".into()),
+            );
         }
     };
     let method = request.get("method").and_then(Value::as_str).unwrap_or("");
@@ -131,7 +135,12 @@ pub async fn rpc(
                 let working = json!({"id": id, "jsonrpc": "2.0", "result": task_json_with_state(&task, "working")});
                 let final_event = json!({"id": id, "jsonrpc": "2.0", "result": task_json(&task)});
                 let body = format!("data: {working}\n\ndata: {final_event}\n\n");
-                (StatusCode::OK, [("content-type", "text/event-stream")], body).into_response()
+                (
+                    StatusCode::OK,
+                    [("content-type", "text/event-stream")],
+                    body,
+                )
+                    .into_response()
             }
             Err(error) => rpc_error(id, -32000, error),
         },
@@ -146,8 +155,10 @@ pub async fn rpc(
         "tasks/list" => {
             let tasks = state.tasks.lock().map(|map| {
                 map.values()
-                    .filter(|task| task.owner == caller.id() || matches!(caller, Caller::Operator { .. }))
-                    .map(|task| task_json(task))
+                    .filter(|task| {
+                        task.owner == caller.id() || matches!(caller, Caller::Operator { .. })
+                    })
+                    .map(task_json)
                     .collect::<Vec<Value>>()
             });
             match tasks {
@@ -155,7 +166,11 @@ pub async fn rpc(
                 Err(_) => rpc_error(id, -32000, VoltaError::ConfigInvalid("lock".into())),
             }
         }
-        _ => rpc_error(id, -32601, VoltaError::Validation(format!("method {method}"))),
+        _ => rpc_error(
+            id,
+            -32601,
+            VoltaError::Validation(format!("method {method}")),
+        ),
     }
 }
 
@@ -174,13 +189,22 @@ fn rpc_error(id: Value, code: i64, error: VoltaError) -> Response {
 
 /// Execute a message/send: dispatch on the skill, record the
 /// task, and return it.
-async fn send_message(state: &AppState, caller: &Caller, params: &Value) -> Result<TaskRecord, VoltaError> {
+async fn send_message(
+    state: &AppState,
+    caller: &Caller,
+    params: &Value,
+) -> Result<TaskRecord, VoltaError> {
     let message = params.get("message").cloned().unwrap_or(json!({}));
     let metadata = params.get("metadata").cloned().unwrap_or(json!({}));
     let skill = metadata
         .get("volta.skill")
         .and_then(Value::as_str)
-        .or_else(|| message.get("metadata").and_then(|m| m.get("volta.skill")).and_then(Value::as_str))
+        .or_else(|| {
+            message
+                .get("metadata")
+                .and_then(|m| m.get("volta.skill"))
+                .and_then(Value::as_str)
+        })
         .unwrap_or("")
         .to_string();
     let context_id = params
@@ -188,7 +212,11 @@ async fn send_message(state: &AppState, caller: &Caller, params: &Value) -> Resu
         .and_then(Value::as_str)
         .unwrap_or("")
         .to_string();
-    let parts = message.get("parts").and_then(Value::as_array).cloned().unwrap_or_default();
+    let parts = message
+        .get("parts")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
     let data = parts
         .iter()
         .find(|part| part.get("kind").and_then(Value::as_str) == Some("data"))
@@ -199,7 +227,9 @@ async fn send_message(state: &AppState, caller: &Caller, params: &Value) -> Resu
         artifacts: vec![],
         context_id,
         created_unix: unix_now(),
-        history: vec![json!({"state": "submitted", "timestamp": crate::http_util::rfc3339(unix_now())})],
+        history: vec![
+            json!({"state": "submitted", "timestamp": crate::http_util::rfc3339(unix_now())}),
+        ],
         id: task_id,
         owner: caller.id(),
         skill: skill.clone(),
@@ -220,7 +250,10 @@ async fn send_message(state: &AppState, caller: &Caller, params: &Value) -> Resu
             }));
         }
     }
-    let mut tasks = state.tasks.lock().map_err(|_| VoltaError::ConfigInvalid("lock".into()))?;
+    let mut tasks = state
+        .tasks
+        .lock()
+        .map_err(|_| VoltaError::ConfigInvalid("lock".into()))?;
     tasks.insert(task.id.clone(), task.clone());
     Ok(task)
 }
@@ -239,7 +272,10 @@ async fn run_skill(
             if matches!(caller, Caller::Anonymous) {
                 return Err(VoltaError::AuthRequired);
             }
-            let intent = data.get("intent").and_then(Value::as_str).unwrap_or("issue");
+            let intent = data
+                .get("intent")
+                .and_then(Value::as_str)
+                .unwrap_or("issue");
             match intent {
                 "fetch" => {
                     let key_id = data.get("key_id").and_then(Value::as_str).unwrap_or("");
@@ -247,12 +283,21 @@ async fn run_skill(
                         .ephemeral
                         .get_key(key_id)?
                         .ok_or(VoltaError::KeyNotFound)?;
-                    Ok(artifact("ephemeral-key", key_record_json(&record, false, true)))
+                    Ok(artifact(
+                        "ephemeral-key",
+                        key_record_json(&record, false, true),
+                    ))
                 }
                 "issue" => {
                     let body = IssueBody {
-                        audience: data.get("audience").and_then(Value::as_str).map(str::to_string),
-                        custody: data.get("custody").and_then(Value::as_str).map(str::to_string),
+                        audience: data
+                            .get("audience")
+                            .and_then(Value::as_str)
+                            .map(str::to_string),
+                        custody: data
+                            .get("custody")
+                            .and_then(Value::as_str)
+                            .map(str::to_string),
                         owner_id: caller.id(),
                         public_material: data.get("public_material").and_then(|value| {
                             serde_json::from_value::<PublicMaterialBody>(value.clone()).ok()
@@ -271,7 +316,10 @@ async fn run_skill(
                         ttl_seconds: data.get("ttl_seconds").and_then(Value::as_u64),
                     };
                     let record = issue_key(state, &caller.id(), &body, None)?;
-                    Ok(artifact("ephemeral-key", key_record_json(&record, false, true)))
+                    Ok(artifact(
+                        "ephemeral-key",
+                        key_record_json(&record, false, true),
+                    ))
                 }
                 "rotate" => {
                     let key_id = data.get("key_id").and_then(Value::as_str).unwrap_or("");
@@ -279,7 +327,8 @@ async fn run_skill(
                         .ephemeral
                         .get_key(key_id)?
                         .ok_or(VoltaError::KeyNotFound)?;
-                    if caller.id() != record.owner_id && !matches!(caller, Caller::Operator { .. }) {
+                    if caller.id() != record.owner_id && !matches!(caller, Caller::Operator { .. })
+                    {
                         return Err(VoltaError::Forbidden("not the key owner".to_string()));
                     }
                     let body = IssueBody {
@@ -294,15 +343,22 @@ async fn run_skill(
                         suite: record.suite.clone(),
                         ttl_seconds: Some(record.expires_unix - record.created_unix),
                     };
-                    let successor = issue_key(state, &record.owner_id, &body, Some(key_id.to_string()))?;
+                    let successor =
+                        issue_key(state, &record.owner_id, &body, Some(key_id.to_string()))?;
                     state.ephemeral.set_status(key_id, "superseded")?;
-                    Ok(artifact("ephemeral-key", key_record_json(&successor, false, true)))
+                    Ok(artifact(
+                        "ephemeral-key",
+                        key_record_json(&successor, false, true),
+                    ))
                 }
                 _ => Err(VoltaError::Validation(format!("intent {intent}"))),
             }
         }
         "key-lookup" => {
-            let by = data.get("by").and_then(Value::as_str).unwrap_or("fingerprint");
+            let by = data
+                .get("by")
+                .and_then(Value::as_str)
+                .unwrap_or("fingerprint");
             let query = data
                 .get("query")
                 .and_then(Value::as_str)
@@ -332,7 +388,11 @@ async fn run_skill(
                 .and_then(Value::as_str)
                 .and_then(|bytes| crate::http_util::b64_decode(bytes).ok())
                 .and_then(|bytes| String::from_utf8(bytes).ok())
-                .or_else(|| data.get("keytext").and_then(Value::as_str).map(str::to_string))
+                .or_else(|| {
+                    data.get("keytext")
+                        .and_then(Value::as_str)
+                        .map(str::to_string)
+                })
                 .ok_or_else(|| VoltaError::Validation("keytext".to_string()))?;
             let records = crate::hkp::ingest_armor(state, &keytext)?;
             let record = records.into_iter().next().ok_or(VoltaError::KeyNotFound)?;
@@ -360,7 +420,10 @@ async fn run_skill(
             if !caller.has_permission("relay-fetch") {
                 return Err(VoltaError::Forbidden("relay-fetch permission".to_string()));
             }
-            let fingerprint = data.get("fingerprint").and_then(Value::as_str).unwrap_or("");
+            let fingerprint = data
+                .get("fingerprint")
+                .and_then(Value::as_str)
+                .unwrap_or("");
             let peer = data.get("peer").and_then(Value::as_str).unwrap_or("");
             let fetched = crate::relay::relay_fetch_key(state, fingerprint, peer).await?;
             Ok(artifact("relay-fetch", fetched))
@@ -386,7 +449,10 @@ fn task_action(
         .get("id")
         .and_then(Value::as_str)
         .ok_or_else(|| VoltaError::Validation("id".to_string()))?;
-    let mut tasks = state.tasks.lock().map_err(|_| VoltaError::ConfigInvalid("lock".into()))?;
+    let mut tasks = state
+        .tasks
+        .lock()
+        .map_err(|_| VoltaError::ConfigInvalid("lock".into()))?;
     let task = tasks.get_mut(id).ok_or(VoltaError::NotFound)?;
     if task.owner != caller.id() && !matches!(caller, Caller::Operator { .. }) {
         return Err(VoltaError::NotFound);
