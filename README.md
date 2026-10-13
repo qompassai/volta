@@ -1,6 +1,6 @@
 <p align="center">
   <a href="https://www.rust-lang.org/"><img src="https://img.shields.io/badge/Rust-000000?style=for-the-badge&logo=rust&logoColor=white" alt="Rust"></a>
-  <a href="./NOTICE"><img src="https://img.shields.io/badge/License-AGPL%203.0%20%7C%20Apache%202.0-blue.svg" alt="License: AGPL 3.0 | Apache 2.0"></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License: Apache 2.0"></a>
 </p>
 
 # Volta
@@ -64,3 +64,7 @@ boundary. The `dist/` asset tree is upstream material and retains
 its own provenance. Copyright 2026 Qompass AI.
 
 </details>
+
+## License
+
+This project is licensed under the [Apache License, Version 2.0](./LICENSE).

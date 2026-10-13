@@ -18,7 +18,7 @@ name = "volta-database"
 version = "0.1.0"
 authors = ["Matt A. Porter <map@qompass.ai>"]
 edition = "2024"
-license = "AGPL-3.0-only"
+license = "Apache-2.0"
 rust-version = "1.89"
 
 [dependencies]
