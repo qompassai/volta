@@ -1,6 +1,6 @@
 # Volta Rewrite — Behavior / Interface Specification
 
-- **Status:** Clean-room behavior/interface spec, v1.0, 2026-10-10.
+- **Status:** Behavior/interface spec, v1.0, 2026-10-10.
 - **Scope:** Everything an implementer needs to build a wire-compatible,
   behavior-compatible successor to volta (the Hagrid-derived OpenPGP key
   server) plus the new agent-era surfaces mandated 2026-10-10: ephemeral
@@ -30,7 +30,7 @@
 
 ---
 
-## 1. Clean-room provenance
+## 1. Provenance
 
 This spec was derived **only** from public surfaces. No implementation
 source of the predecessor tree (no `.rs` file under `src/`, `database/`,

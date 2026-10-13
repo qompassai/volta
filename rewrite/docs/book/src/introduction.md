@@ -44,7 +44,7 @@ structured error, not negotiated down.
 <details>
 <summary>Lineage and licensing</summary>
 
-This tree is a clean-room rewrite (2026-10-10), written from a
+This tree is a rewrite (2026-10-10), written from a
 behavioral specification derived from public protocol documents
 and black-box observation — not from the predecessor's source.
 First-party code is dual licensed AGPL-3.0-only OR Apache-2.0;

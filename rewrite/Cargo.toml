@@ -1,10 +1,10 @@
 # #################################################################
 # /qompassai/volta/rewrite/Cargo.toml
-# Qompass AI Volta Clean-Room Rewrite — Workspace
+# Qompass AI Volta Rewrite — Workspace
 # SPDX-License-Identifier: AGPL-3.0-only OR Apache-2.0
 # Copyright (c) 2026 Qompass AI
 #
-# Original work of Qompass AI (clean-room rewrite, 2026-10-10).
+# Original work of Qompass AI (rewrite, 2026-10-10).
 # Dual-licensed under AGPL-3.0-only OR Apache-2.0 at the
 # recipient's choice (see LICENSE, LICENSE-AGPL, NOTICE).
 # #################################################################

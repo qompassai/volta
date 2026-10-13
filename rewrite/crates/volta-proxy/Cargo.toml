@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-description = "Volta clean-room rewrite: fail-closed multi-hop proxy chains (SOCKS5/SOCKS5h, HTTP CONNECT, Tor SOCKS, volta-relay)"
+description = "Volta rewrite: fail-closed multi-hop proxy chains (SOCKS5/SOCKS5h, HTTP CONNECT, Tor SOCKS, volta-relay)"
 
 [dependencies]
 base64.workspace = true

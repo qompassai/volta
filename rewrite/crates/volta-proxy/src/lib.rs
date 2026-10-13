@@ -4,7 +4,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only OR Apache-2.0
 // Copyright (c) 2026 Qompass AI
 //
-// Original work of Qompass AI (clean-room rewrite, 2026-10-10).
+// Original work of Qompass AI (rewrite, 2026-10-10).
 // #################################################################
 
 #![forbid(unsafe_code)]

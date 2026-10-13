@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-description = "Volta clean-room rewrite: algorithm allowlist, hybrid PQC KEM suites, ML-DSA-87 and Ed25519 signing"
+description = "Volta rewrite: algorithm allowlist, hybrid PQC KEM suites, ML-DSA-87 and Ed25519 signing"
 
 [dependencies]
 base64.workspace = true

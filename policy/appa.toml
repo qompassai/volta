@@ -4,7 +4,7 @@
 # Pax volta profile for OpenAPPA (estate adaptation, 2026-10-10).
 #
 # Case: a dispatched Claude worker doing Rust work in this repository
-# (the clean-room volta rewrite: key server, proxy, MCP/A2A surfaces).
+# (the volta rewrite: key server, proxy, MCP/A2A surfaces).
 # This profile is the second, deterministic gate under the harness's
 # own permissions, modeled on the OpenAPPA pilot's image profile
 # (~/openappa-pilot/profiles/image/appa.toml): the claude-code battery

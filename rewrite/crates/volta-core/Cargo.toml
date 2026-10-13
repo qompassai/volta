@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-description = "Volta clean-room rewrite: data model, content-addressed store, config, sealed tokens, error taxonomy"
+description = "Volta rewrite: data model, content-addressed store, config, sealed tokens, error taxonomy"
 
 [dependencies]
 aes-gcm.workspace = true

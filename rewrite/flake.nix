@@ -1,13 +1,13 @@
 # #################################################################
 # /qompassai/volta/rewrite/flake.nix
-# Qompass AI Volta Clean-Room Rewrite — Flake
+# Qompass AI Volta Rewrite — Flake
 # SPDX-License-Identifier: AGPL-3.0-only OR Apache-2.0
 # Copyright (c) 2026 Qompass AI
 #
-# Original work of Qompass AI (clean-room rewrite, 2026-10-10).
+# Original work of Qompass AI (rewrite, 2026-10-10).
 # #################################################################
 {
-  description = "Volta (clean-room rewrite) — secure key server for MCP and A2A: OpenPGP key service, ephemeral hybrid-PQC keys, WebAuthn operator auth, fail-closed proxy chains";
+  description = "Volta (rewrite) — secure key server for MCP and A2A: OpenPGP key service, ephemeral hybrid-PQC keys, WebAuthn operator auth, fail-closed proxy chains";
 
   inputs = {
     fenix = {
