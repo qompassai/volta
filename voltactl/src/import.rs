@@ -26,7 +26,8 @@ extern crate tempfile;
 
 extern crate sequoia_openpgp as openpgp;
 use openpgp::Packet;
-use openpgp::parse::{PacketParser, PacketParserResult, Parse};
+use openpgp::armor::ReaderMode;
+use openpgp::parse::{Dearmor, PacketParserBuilder, PacketParserResult, Parse};
 
 extern crate volta_database as database;
 use database::{Database, ImportResult, KeyDatabase};
@@ -188,7 +189,13 @@ fn read_file_to_tpks(
     reader: impl Read + Send + Sync,
     callback: &mut impl FnMut(Vec<Packet>),
 ) -> Result<()> {
-    let mut ppr = PacketParser::from_reader(reader)?;
+    // Accept armored input as well as binary: operators feed import
+    // from `gpg --export` in either form, and the rest of the product
+    // (VKS upload) dearmors with these same settings. Dearmor::Auto
+    // passes binary data through unchanged. Feeding armor straight to
+    // the packet parser used to yield zero keys, silently.
+    let mut ppr = PacketParserBuilder::from_reader(reader)
+        .and_then(|ppb| ppb.dearmor(Dearmor::Auto(ReaderMode::VeryTolerant)).build())?;
     let mut acc = Vec::new();
 
     // Iterate over all packets.
@@ -207,6 +214,13 @@ fn read_file_to_tpks(
         acc.push(packet);
     }
 
+    // Flush the final key: the callback above only fires when a new
+    // primary key begins, so the last key of the file is still pending
+    // here. Dropping it used to lose one key per file, silently.
+    if !acc.is_empty() {
+        callback(acc);
+    }
+
     Ok(())
 }
 
@@ -214,45 +228,156 @@ fn import_key(db: &KeyDatabase, packets: Vec<Packet>) -> Result<ImportResult> {
     openpgp::Cert::from_packets(packets.into_iter()).and_then(|tpk| db.merge(tpk))
 }
 
-/*
 #[cfg(test)]
 mod import_tests {
-    use std::fs::File;
+    use std::io::Cursor;
+
+    use openpgp::cert::CertBuilder;
+    use openpgp::serialize::{Serialize, SerializeInto};
     use tempfile::tempdir;
-    use openpgp::serialize::Serialize;
+
     use super::*;
 
+    fn make_cert(email: &str) -> openpgp::Cert {
+        CertBuilder::new()
+            .add_userid(format!("Test <{email}>"))
+            .generate()
+            .unwrap()
+            .0
+    }
+
+    fn binary(cert: &openpgp::Cert) -> Vec<u8> {
+        let mut buf = Vec::new();
+        cert.export(&mut buf).unwrap();
+        buf
+    }
+
+    fn armored(cert: &openpgp::Cert) -> Vec<u8> {
+        cert.armored().export_to_vec().unwrap()
+    }
+
+    fn collect(input: &[u8]) -> Result<Vec<Vec<Packet>>> {
+        let mut keys = Vec::new();
+        read_file_to_tpks(Cursor::new(input.to_vec()), &mut |packets| {
+            keys.push(packets);
+        })?;
+        Ok(keys)
+    }
+
+    fn primary_fpr(packets: &[Packet]) -> String {
+        match &packets[0] {
+            Packet::PublicKey(key) => key.fingerprint().to_hex(),
+            Packet::SecretKey(key) => key.fingerprint().to_hex(),
+            other => panic!("first packet is not a primary key: {other:?}"),
+        }
+    }
+
+    // Regression: the parser must flush the pending key at EOF. It used
+    // to only fire the callback when a *new* primary key began, silently
+    // dropping the last key of every file (a one-key file imported zero
+    // keys, rc=0).
     #[test]
-    fn import() {
+    fn single_binary_key_yields_one_key() {
+        let cert = make_cert("one@invalid.example.com");
+        let keys = collect(&binary(&cert)).unwrap();
+        assert_eq!(keys.len(), 1);
+        assert_eq!(primary_fpr(&keys[0]), cert.fingerprint().to_hex());
+    }
+
+    #[test]
+    fn two_binary_keys_yield_two_keys() {
+        let a = make_cert("a@invalid.example.com");
+        let b = make_cert("b@invalid.example.com");
+        let mut input = binary(&a);
+        input.extend_from_slice(&binary(&b));
+        let keys = collect(&input).unwrap();
+        assert_eq!(keys.len(), 2);
+        assert_eq!(primary_fpr(&keys[0]), a.fingerprint().to_hex());
+        assert_eq!(primary_fpr(&keys[1]), b.fingerprint().to_hex());
+    }
+
+    // The rest of the product (VKS upload, database lookup) accepts
+    // armored key material; import must dearmor transparently too.
+    // It used to parse armored input to zero keys, silently.
+    #[test]
+    fn single_armored_key_yields_one_key() {
+        let cert = make_cert("armored@invalid.example.com");
+        let keys = collect(&armored(&cert)).unwrap();
+        assert_eq!(keys.len(), 1);
+        assert_eq!(primary_fpr(&keys[0]), cert.fingerprint().to_hex());
+    }
+
+    #[test]
+    fn empty_input_yields_no_keys() {
+        let keys = collect(&[]).unwrap();
+        assert_eq!(keys.len(), 0);
+    }
+
+    // Adversarial: a truncated import must fail loudly, never import a
+    // partial key in silence.
+    #[test]
+    fn truncated_final_key_is_an_error() {
+        let a = make_cert("first@invalid.example.com");
+        let b = make_cert("second@invalid.example.com");
+        let b_bin = binary(&b);
+        let mut input = binary(&a);
+        input.extend_from_slice(&b_bin[..b_bin.len() / 2]);
+        assert!(collect(&input).is_err());
+    }
+
+    #[test]
+    fn truncated_single_key_is_an_error() {
+        let bin = binary(&make_cert("cut@invalid.example.com"));
+        assert!(collect(&bin[..bin.len() / 2]).is_err());
+    }
+
+    fn test_db(root: &Path) -> KeyDatabase {
+        KeyDatabase::new_internal(
+            root.join("internal"),
+            root.join("external"),
+            root.join("tmp"),
+            false,
+        )
+        .unwrap()
+    }
+
+    fn check_lookup(db: &KeyDatabase, cert: &openpgp::Cert) {
+        let query: database::Query = cert.fingerprint().to_hex().parse().unwrap();
+        let found = db
+            .lookup(&query)
+            .unwrap()
+            .expect("imported key must be in the database");
+        assert_eq!(found.fingerprint(), cert.fingerprint());
+    }
+
+    // End to end (replaces the long-commented-out import test, whose
+    // APIs no longer exist): a one-key file must actually land in the
+    // database, for both the binary and the armored form.
+    #[test]
+    fn import_single_key_file() {
         let root = tempdir().unwrap();
+        let db = test_db(root.path());
+        let cert = make_cert("foo@invalid.example.com");
+        let file = root.path().join("import-me.gpg");
+        std::fs::write(&file, binary(&cert)).unwrap();
 
-        let db = KeyDatabase::new_from_base(root.path().to_path_buf()).unwrap();
+        let multi_progress = MultiProgress::new();
+        import_from_file(&db, &file, &multi_progress).unwrap();
 
-        // Generate a key and import it.
-        let (tpk, _) = openpgp::tpk::TPKBuilder::autocrypt(
-            None, Some("foo@invalid.example.com".into()))
-            .generate().unwrap();
-        let import_me = root.path().join("import-me");
-        tpk.serialize(&mut File::create(&import_me).unwrap()).unwrap();
+        check_lookup(&db, &cert);
+    }
 
-        do_import(root.path().to_path_buf(), vec![import_me]).unwrap();
+    #[test]
+    fn import_single_armored_key_file() {
+        let root = tempdir().unwrap();
+        let db = test_db(root.path());
+        let cert = make_cert("armored-file@invalid.example.com");
+        let file = root.path().join("import-me.asc");
+        std::fs::write(&file, armored(&cert)).unwrap();
 
-        let check = |query: &str| {
-            let tpk_ = db.lookup(&query.parse().unwrap()).unwrap().unwrap();
-            assert_eq!(tpk.fingerprint(), tpk_.fingerprint());
-            assert_eq!(tpk.subkeys().map(|skb| skb.subkey().fingerprint())
-                       .collect::<Vec<_>>(),
-                       tpk_.subkeys().map(|skb| skb.subkey().fingerprint())
-                       .collect::<Vec<_>>());
-            assert_eq!(tpk_.userids().count(), 0);
-        };
+        let multi_progress = MultiProgress::new();
+        import_from_file(&db, &file, &multi_progress).unwrap();
 
-        check(&format!("{}", tpk.primary().fingerprint()));
-        check(&format!("{}", tpk.primary().fingerprint().to_keyid()));
-        check(&format!("{}", tpk.subkeys().nth(0).unwrap().subkey()
-                       .fingerprint()));
-        check(&format!("{}", tpk.subkeys().nth(0).unwrap().subkey()
-                       .fingerprint().to_keyid()));
+        check_lookup(&db, &cert);
     }
 }
-*/
