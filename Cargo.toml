@@ -87,3 +87,14 @@ debug = false
 
 [workspace]
 members = ["database", "voltactl"]
+
+# gettext-macros 0.6.1 is unmaintained (in-range update moves 0 packages)
+# and its proc macros race when cargo expands this crate's targets in
+# parallel: Config::write truncated the shared config file in place
+# (torn reads -> "Invalid config file" panic on cold builds) and msgfmt
+# wrote .mo files in place. The vendored copy under vendor/gettext-macros
+# is byte-identical to the crates.io release except that both writes now
+# go through a per-process temp file renamed over the target (atomic).
+# See the VOLTA PATCH comments in vendor/gettext-macros/src/lib.rs.
+[patch.crates-io]
+gettext-macros = { path = "vendor/gettext-macros" }
