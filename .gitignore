@@ -6,6 +6,7 @@
 **/.*.swo
 target
 *.po~
+/po/volta/volta.pot
 /dist/templates/localized
 book/
 result

@@ -31,11 +31,18 @@ extern crate volta_database as database;
 
 use gettext_macros::init_i18n;
 
+// po generation is disabled (po = false): compile_i18n! would otherwise run
+// msgmerge -U on the in-tree .po files during macro expansion. Cargo expands
+// this crate's targets in parallel, so concurrent msgmerge runs read files
+// another process is rewriting (cold-build panic: "Couldn't update PO file")
+// and every build churns po/. The committed .po files are the translation
+// source of record; refresh them deliberately with msgmerge outside builds.
+// .mo compilation stays enabled and reads the committed .po files.
 #[cfg(debug_assertions)]
-init_i18n!("volta", en, de, ja);
+init_i18n!("volta", po = false, en, de, ja);
 
 #[cfg(not(debug_assertions))]
-init_i18n!("volta", en);
+init_i18n!("volta", po = false, en);
 
 mod anonymize_utils;
 mod counters;
