@@ -32,7 +32,7 @@ rocket = { version = "0.5.0-rc.1", features = ["json"] }
 rocket_dyn_templates = { version = "0.1.0-rc.1", features = ["handlebars"] }
 rocket_codegen = "0.5.0-rc.1"
 sequoia-openpgp = { version = "1", default-features = false, features = [
-  "crypto-nettle",
+  "crypto-openssl",
 ] }
 multipart = { version = "0", default-features = false, features = ["server"] }
 serde = "1.0"
